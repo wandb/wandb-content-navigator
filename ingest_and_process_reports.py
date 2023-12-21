@@ -1,14 +1,36 @@
-
 import json
 import wandb
+import argparse
 import pandas as pd
 from tqdm import tqdm
 from google.cloud import bigquery
 
-def get_reports_from_bigquery(created_after=None):
+
+def get_reports_ids():
     client = bigquery.Client(project='wandb-production')
 
     query = """
+        SELECT DISTINCT
+            lower(REGEXP_REPLACE(COALESCE(
+            REGEXP_EXTRACT(report_path, "(--[Vv]ml[^/?]+)"),
+            REGEXP_EXTRACT(report_path, "(/[Vv]ml[^/?]+)"), 
+            REGEXP_EXTRACT(report_path, "([Vv]ml[^/?]+)")),
+            "^[/-]+", "")) as reportID
+        FROM 
+            analytics.dim_reports
+        WHERE
+            is_public
+        """
+    
+    report_ids_df = client.query(query).to_dataframe()
+    return report_ids_df
+
+
+def get_reports_from_bigquery(report_ids : str, created_after=None):
+    
+    client = bigquery.Client(project='wandb-production')
+
+    query = f"""
     SELECT 
        created_at, 
        description,
@@ -29,8 +51,10 @@ def get_reports_from_bigquery(created_after=None):
         analytics.dim_reports
     WHERE
         is_public
-        AND showcased_at IS NOT NULL
+        and LOWER(REGEXP_EXTRACT(report_path, r'reports/--(.*)')) in ({report_ids})
     """
+
+    # # AND showcased_at IS NOT NULL
 
     if created_after:
         query += f"AND created_at >= '{created_after}'"
@@ -189,41 +213,56 @@ def extract_fc_report_ids(fc_spec_df):
 
 
 
-####################################
-
-
-if __name__ == "__main__":
-    
+def main(args):
     OUTPUT_FILE = 'reports_final.csv'
 
     ### Download fully connected spec from BigQuery
-    # fc_spec_df = get_fully_connected_spec()
-    # fc_spec_df.to_csv('fc_spec.csv')
+    
+    if args.refresh_data:
+        # Get all public reports ids from BigQuery
+        report_ids_df = get_reports_ids()
+        report_ids_df.to_csv('all_report_ids.csv')
 
-    fc_spec_df = pd.read_csv('fc_spec.csv', index_col=0)
-    fc_ids_df = extract_fc_report_ids(fc_spec_df)
+        # Get views info for just Fully Connected reports from BigQuery
+        fc_spec_df = get_fully_connected_spec()
+        fc_spec_df.to_csv('fc_spec.csv')
 
-
-    ### Download reports data from BigQuery
-    # reports_df = get_reports_from_bigquery()
-    # print(f"Downloaded {len(reports_df)} reports")
-    # reports_df.to_csv('report_data.csv')
-
-    ### load reports data
-    reports_df = pd.read_csv('report_data.csv', index_col=0)
-    reports_df['reportID'] = reports_df['report_path'].str.split('reports/--', n=1, expand=True)[1].str.lower()
-    # print(reports_df['reportID'].values[:10])
+        fc_ids_df = extract_fc_report_ids(fc_spec_df)
 
 
-    ### Filter reports down to just Fully Connected reports
-    print(f"Before filtering, there are {len(reports_df)} reports")
-    reports_df = fc_ids_df.merge(
-            reports_df, 
-            how='inner', 
-            on='reportID', 
-            # right_index=True
-        )
-    print(f"After filtering, there are {len(reports_df)} reports")
+        ### Filter report IDs down to just Fully Connected reports using the IDs from fc_ids_df
+        print(f"Before filtering, there are {len(report_ids_df)} reports")
+
+        report_ids_df = report_ids_df.merge(
+                fc_ids_df, 
+                how='inner', 
+                on='reportID', 
+            )
+        
+        print(f"After filtering, there are {len(report_ids_df)} FC report IDs to fetch")
+        
+        # Pus report ids into a string for BigQuery query
+        report_ids_str = ""
+        for id in report_ids_df['reportID'].values:
+            report_ids_str += f"'{id}',"
+
+
+        ### Get all reports data from BigQuery
+        ### load reports data
+        # reports_df = pd.read_csv('report_data.csv', index_col=0)
+        # reports_df['reportID'] = reports_df['report_path'].str.split('reports/--', n=1, expand=True)[1].str.lower()
+        # # print(reports_df['reportID'].values[:10])
+
+        ### Get just Fully Connected reports data from BigQuery
+        reports_df = get_reports_from_bigquery(report_ids_str[:-1])
+        reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
+        reports_df['reportID'] = reports_df['report_path'].str.split('reports/--', n=1, expand=True)[1].str.lower()
+        reports_df.to_csv('raw_reports_data.csv')
+        print(f"{len(reports_df)} Fully Connected Reports fetched")
+    
+    else:
+        reports_df = pd.read_csv('raw_reports_data.csv', index_col=0)
+
 
     ### Process reports text to markdown
     markdown_ls = []
@@ -231,34 +270,48 @@ if __name__ == "__main__":
     spec_type_ls = []
     is_buggy_ls = []
     is_short_report_ls = []
-    for _, row in tqdm(reports_df.iterrows()):
-        markdown, buggy_report_id, is_buggy, spec_type = spec_to_markdown(row['spec'], 
-                                                    row['report_id'],
-                                                    row['display_name']
-                                                    )
-        
-        markdown_ls.append(markdown)
-        buggy_report_ids.append(buggy_report_id)
-        spec_type_ls.append(spec_type)
-        is_buggy_ls.append(is_buggy)
-
-        # check if markdown has less than 100 characters
-        if len(markdown) < 100:
+    for idx, row in tqdm(reports_df.iterrows()):
+        if row['spec'] is None or isinstance(row['spec'], float): 
+            print(idx)
+            markdown_ls.append("spec-error")
+            buggy_report_ids.append(row['report_id'])
+            spec_type_ls.append("spec-error")
+            is_buggy_ls.append(True)
             is_short_report_ls.append(True)
+            
         else:
-            is_short_report_ls.append(False)
+            markdown, buggy_report_id, is_buggy, spec_type = spec_to_markdown(row['spec'], 
+                                                        row['report_id'],
+                                                        row['display_name']
+                                                        )
+            
+            markdown_ls.append(markdown)
+            buggy_report_ids.append(buggy_report_id)
+            spec_type_ls.append(spec_type)
+            is_buggy_ls.append(is_buggy)
+
+            # check if markdown has less than 100 characters
+            if len(markdown) < 100:
+                is_short_report_ls.append(True)
+            else:
+                is_short_report_ls.append(False)
 
     reports_df['markdown_text'] = markdown_ls
     reports_df['spec_type'] = spec_type_ls
     reports_df['is_buggy'] = is_buggy_ls
     reports_df['is_short_report'] = is_short_report_ls
 
-    
     reports_df["content"] = "\n# " + reports_df["display_name"] + "\n\nDescription: " + reports_df["description"] + "\n\nBody:\n\n" + reports_df['markdown_text']
+    reports_df["character_count"] = len(reports_df["content"])
     reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
 
-    ### Save reports to CSV and W&B
+    # tidy up the dataframe
+    reports_df.drop(columns=['markdown_text'], inplace=True)
+    reports_df.drop(columns=['spec'], inplace=True)
+    reports_df.sort_values(by=['created_at'], inplace=True, ascending=False)
 
+    ### Save reports to CSV and W&B
+    # print(reports_df.head())
     reports_df.to_csv(OUTPUT_FILE)
 
     ### Push to W&B 
@@ -266,9 +319,45 @@ if __name__ == "__main__":
                project='wandbot_public',
                entity='wandbot',
                job_type='upload_fc_reports')
-    tbl = wandb.Table(dataframe=reports_df)
+    tbl = wandb.Table(dataframe=reports_df)  # reports_df.iloc[:50,:])
 
     artifact = wandb.Artifact('fc-markdown-reports', type='fully-connected-dataset')
     artifact.add_file(OUTPUT_FILE) #, 'fc-markdown-reports')
     wandb.log_artifact(artifact)
-    wandb.log({"reports": tbl})
+    wandb.log({"reports4": tbl})
+
+
+####################################
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Get Fully Connected Reports from BigQuery')
+    parser.add_argument('--refresh_data', 
+        action='store_true', 
+        help='refresh data from BigQuery')
+    args = parser.parse_args()
+
+    main(args)
+
+
+    ## Try simple_parsing at some point
+    # from dataclasses import dataclass
+    # from simple_parsing import ArgumentParser
+
+    # parser = ArgumentParser()
+    # parser.add_argument("--foo", type=int, default=123, help="foo help")
+
+    # @dataclass
+    # class Options:
+    #     """ Help string for this group of command-line arguments """
+    #     log_dir: str                # Help string for a required str argument
+    #     learning_rate: float = 1e-4 # Help string for a float argument
+
+    # parser.add_arguments(Options, dest="options")
+
+    # args = parser.parse_args()
+    # print("foo:", args.foo)
+    # print("options:", args.options)
+    
+    
