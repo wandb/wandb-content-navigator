@@ -16,50 +16,25 @@ import instructor
 from openai import OpenAI
 from tqdm.auto import tqdm
 
-class UseCase(Enum):
-    AUTOMOTIVE = "Automotive Industry: Self-Driving Cars"
-    LIFE_SCIENCES = "Life Sciences and Healthcare"
-    FINANCE = "Finance and Banking"
-    RETAIL = "Retail and E-commerce"
-    MANUFACTURING = "Manufacturing and Industrial Automation"
-    ENTERTAINMENT = "Entertainment and Media"
-    ENERGY = "Energy and Utilities"
-    AGRICULTURE = "Agriculture and Food Production"
-    EDUCATION = "Education and E-Learning"
-    CYBERSECURITY = "Cybersecurity and Network Management"
-    TRAVEL = "Travel and Hospitality"
-    HR = "Human Resources and Recruitment"
-    OTHER = "Other"
-
-class ValueProposition(Enum):
-    Quick_Setup = "Set up W&B in 5 minutes for machine learning pipelines with tracked and versioned models and data."
-    Experiment_Tracking = "Track and visualize all machine learning experiments."
-    Model_Registry = "Maintain a centralized hub of all models for seamless handoff to devops and deployment."
-    Launch = "Package and run ML workloads to access powerful compute resources easily."
-    Sweeps = "Hyperparameter tuning and model optimization."
-    LLM_Debugging_Monitoring = "Tools for LLM debugging and monitoring including usage of OpenAI's GPT API."
-    Artifacts = "Version datasets and models and track lineage."
-    Visualization = "Visualize and query all kinds of data including rich media like images and videos."
-    Reproducibility = "Capture metrics, hyperparameters, code version and save model checkpoints for reproducibility."
-    Collaboration = "Facilitate project collaboration."
-    Custom_Automations = "Configure custom automations for model CI/CD workflows."
-    Auditability = "A System of Record for all your ML workstreams"
-    Enterprise_Grade = "Enterprise-grade security and governance."
-    Ease_Of_Use = "Easy to use and integrate with existing workflows."
-    Productivity_and_Speed = "Productivity and faster iterations for ML teams."
+MAX_ROWS = 20 #-1
 
 class Article(BaseModel):
     use_case: str = Field(description="Use case covered in the report")
-    value_props: str = Field(description="Value propositions covered in the report")
-    application: str = Field(description="ML application covered in the report")
-    integrations: str = Field(description="Integrations covered in the report")
+    value_props: List[str] = Field(description="W&B value propositions covered in the report")
+    application: List[str] = Field(description="ML application covered in the report")
+    integrations: List[str] = Field(description="Integrations covered in the report")
     summary: str = Field(description="Concise summary of the report")
-    quality: bool = Field(description="Boolean indicating if the report is comprehensive enough and of sufficient quality to share with potential W&B customer (True/False)")
+    audience: List[str] = Field(description="Target audience for the report")
 
 run = wandb.init(project='content-suggestor')
-artifact = run.use_artifact('wandbot/wandbot_public/fc-markdown-reports:v0', type='fully-connected-dataset')
+artifact = run.use_artifact('wandbot/wandbot_public/fc-markdown-reports:latest', type='fully-connected-dataset')
 artifact_dir = artifact.download()
-df = pd.read_csv(f'{artifact_dir}/reports_final.csv')
+# create a dataframe from jsonl file
+df = pd.read_json(f'{artifact_dir}/reports_final.jsonl', lines=True)
+
+
+print(df.head())
+print("*"*100)
 
 system_prompt = \
 """Your are an expert assistant trained on W&B (Weights & Biases) and you are helping us annotate W&B reports.
@@ -67,18 +42,14 @@ You are given a report and you need to perform the following analysis.
 1. Identify the use case reports covers from the below options:
 ```
 class UseCase(Enum):
-    AUTOMOTIVE = "Automotive Industry: Self-Driving Cars"
-    LIFE_SCIENCES = "Life Sciences and Healthcare"
+    AUTOMOTIVE = "Autonomous Driving"
+    ROBOTICS = "Robotics"
+    PHARMA_LIFE_SCIENCES = "Pharma and Life Sciences"
+    HEALTHCARE = "Healthcare Payer and Provider"
     FINANCE = "Finance and Banking"
     RETAIL = "Retail and E-commerce"
-    MANUFACTURING = "Manufacturing and Industrial Automation"
     ENTERTAINMENT = "Entertainment and Media"
-    ENERGY = "Energy and Utilities"
-    AGRICULTURE = "Agriculture and Food Production"
-    EDUCATION = "Education and E-Learning"
-    CYBERSECURITY = "Cybersecurity and Network Management"
-    TRAVEL = "Travel and Hospitality"
-    HR = "Human Resources and Recruitment"
+    HIGH_TECH = "High Tech and Semis"
     OTHER = "Other"
 ```
 2. List W&B value propositions covered in the report using below options:
@@ -95,8 +66,8 @@ class ValueProposition(Enum):
     Reproducibility: "Capture metrics, hyperparameters, code version and save model checkpoints for reproducibility."
     Collaboration: "Facilitate project collaboration."
     Custom_Automations: "Configure custom automations for model CI/CD workflows."
-    Auditability: "A System of Record for all your ML workstreams"
-    Enterprise_Grade: "Enterprise-grade security and governance."
+    Auditability: "A System of Record for all your ML workstreams enabling enterprise-wide visibility and governance."
+    Security: "Enterprise-grade security, RBAC and SOC2 certification."
     Ease_Of_Use: "Easy to use and integrate with existing workflows."
     Productivity_and_Speed: "Productivity and faster iterations for ML teams."
 ```
@@ -110,11 +81,16 @@ Literal["Computer Vision", "Natural Language Processing", "Tabular Data", "Reinf
 Literal["Catalyst", "Dagster", "Databricks", "DeepChecks", "DeepChem", "Docker", "Farama Gymnasium", "Fastai", "Hugging Face Transformers", "Hugging Face Diffusers", "Hugging Face Autotrain", "Hugging Face Accelerate", "Hydra", "Keras", "Kubeflow Pipelines (kfp)", "LangChain", "LightGBM", "Metaflow", "MMDetection", "MMF", "MosaicML Composer", "OpenAI API", "OpenAI Fine-Tuning", "OpenAI Gym", "PaddleDetection", "PaddleOCR", "Prodigy", "PyTorch", "PyTorch Geometric", "PyTorch Ignite", "PyTorch Lightning", "Ray Tune", "SageMaker", "Scikit-Learn", "Simple Transformers", "Skorch", "spaCy", "Stable Baselines 3", "TensorBoard", "TensorFlow", "Julia", "XGBoost", "YOLOv5", "Ultralytics", "YOLOX", "Other", "None"]
 ```
 5. Provide a concise summary of the report.
-6. Decide if the report is comprehensive enough and of sufficient quality to share with potential W&B customer (Yes/No).
+6. Determine target audience for the report based on below options:
+```
+Literal["Experienced ML Engineers", "ML Managers", "ML Ops", "Beginner"]
+```
 Report: \n\n
 """
 
-MODEL_NAME = 'gpt-4-1106-preview'
+wandb.config.update({"system_prompt": system_prompt})
+
+MODEL_NAME = 'gpt-4-0613'
 API_KEY = os.environ.get("OPENAI_API_KEY")
 client = OpenAI(api_key = API_KEY)
 client = instructor.patch(client)
@@ -137,21 +113,31 @@ def extract_with_backoff(user_prompt, **kwargs):
     )
     return resp
 
+if MAX_ROWS == -1: MAX_ROWS = len(df)
+
 extracted = []
-for i in tqdm(range(10)):
-    user_prompt = df.loc[i, 'content'] + "\n\n"
+rows = []
+for i in tqdm(range(MAX_ROWS)):
     try:
+        user_prompt = df.loc[i, 'content'] + "\n\n"
         extracted.append(extract_with_backoff(user_prompt))
+        rows.append(i)
     except Exception as e:
         pass
 
 resp_df = pd.DataFrame([x.dict() for x in extracted])
 resp_df.to_csv('resp_df.csv', index=False)
-
 run.log({"resp_df": wandb.Table(dataframe=resp_df)})
+
+# merge with df on extracted rows
+prev_df = df.loc[rows, :].reset_index(drop=True)
+merged_df = pd.merge(prev_df, resp_df, left_index=True, right_index=True)
+merged_df.to_csv('merged_df.csv', index=False)
+run.log({"reports_metadata": wandb.Table(dataframe=merged_df)})
 
 artifact = wandb.Artifact('processed_fc_articles', type='processed_data')
 artifact.add_file('resp_df.csv')
+artifact.add_file('merged_df.csv')
 run.log_artifact(artifact)
 
 wandb.finish()
