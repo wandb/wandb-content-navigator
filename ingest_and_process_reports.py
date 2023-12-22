@@ -214,7 +214,7 @@ def extract_fc_report_ids(fc_spec_df):
 
 
 def main(args):
-    OUTPUT_FILE = 'reports_final.csv'
+    OUTPUT_FILE = 'reports_final.jsonl'
 
     ### Download fully connected spec from BigQuery
     
@@ -302,7 +302,9 @@ def main(args):
     reports_df['is_short_report'] = is_short_report_ls
 
     reports_df["content"] = "\n# " + reports_df["display_name"] + "\n\nDescription: " + reports_df["description"] + "\n\nBody:\n\n" + reports_df['markdown_text']
-    reports_df["character_count"] = len(reports_df["content"])
+    
+    reports_df["character_count"] = reports_df["content"].map(len)
+    # reports_df["character_count"] = len(reports_df["content"])
     reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
 
     # tidy up the dataframe
@@ -312,7 +314,9 @@ def main(args):
 
     ### Save reports to CSV and W&B
     # print(reports_df.head())
-    reports_df.to_csv(OUTPUT_FILE)
+    # reports_df.to_csv(OUTPUT_FILE)
+
+    reports_df.to_json(OUTPUT_FILE, orient='records', lines=True)
 
     ### Push to W&B 
     wandb.init(name="upload_fully_connected_reports",
