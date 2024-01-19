@@ -85,10 +85,15 @@ def convert_block_to_markdown(block):
     # Handle different types of blocks
     if block['type'] == 'paragraph':
         for child in block['children']:
-            if 'url' in child:
-                md_content += f"[{child['children'][0]['text']}]({child['url']})"
-            elif 'inlineCode' in child and child['inlineCode']:
-                md_content += f"`{child.get('text', '')}`"
+            if 'type' in child:
+                if child['type'] == 'block-quote' or child['type'] == 'callout-block':
+                    md_content += convert_block_to_markdown(child)
+                elif 'url' in child:
+                    md_content += f"[{child['children'][0]['text']}]({child['url']})"
+                elif 'inlineCode' in child and child['inlineCode']:
+                    md_content += f"`{child.get('text', '')}`"
+                else:
+                    md_content += child.get('text', '')
             else:
                 md_content += child.get('text', '')
         md_content += "\n\n"
@@ -257,11 +262,16 @@ def main(args):
         reports_df = get_reports_from_bigquery(report_ids_str[:-1])
         reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
         reports_df['reportID'] = reports_df['report_path'].str.split('reports/--', n=1, expand=True)[1].str.lower()
-        reports_df.to_csv('raw_reports_data.csv')
+        reports_df['description'] = reports_df['description'].fillna('')
+        reports_df['display_name'] = reports_df['display_name'].fillna('')
+        # reports_df.to_csv('raw_reports_data.csv')
+        reports_df.to_json('raw_reports_data.jsonl', orient='records', lines=True)
         print(f"{len(reports_df)} Fully Connected Reports fetched")
     
     else:
-        reports_df = pd.read_csv('raw_reports_data.csv', index_col=0)
+        reports_df = pd.read_json('raw_reports_data.jsonl', lines=True)
+        print(reports_df.head())
+        print(reports_df.columns)
 
 
     ### Process reports text to markdown
@@ -271,6 +281,9 @@ def main(args):
     is_buggy_ls = []
     is_short_report_ls = []
     for idx, row in tqdm(reports_df.iterrows()):
+        # if row["source"] == "https://wandb.ai/wandb_fc/gradient-dissent/reports/--VmlldzozMzE0Njgx":
+        #     print(row["spec"])
+        #     break
         if row['spec'] is None or isinstance(row['spec'], float): 
             print(idx)
             markdown_ls.append("spec-error")
@@ -301,9 +314,21 @@ def main(args):
     reports_df['is_buggy'] = is_buggy_ls
     reports_df['is_short_report'] = is_short_report_ls
 
-    reports_df["content"] = "\n# " + reports_df["display_name"] + "\n\nDescription: " + reports_df["description"] + "\n\nBody:\n\n" + reports_df['markdown_text']
+    reports_df["content"] = "\n# " + reports_df["display_name"] + "\n\nDescription: " + reports_df["description"] + "\n\nBody:\n\n" + reports_df['markdown_text'].astype(str)
     
+    for ii,uu in enumerate(reports_df["content"].values):
+        if isinstance(uu, float):
+            print(uu)
+            print(f"Content: {reports_df['content'].values[ii]}")
+            print(f"Markdown text: {reports_df['markdown_text'].values[ii][:100]}")
+            print(f"Description: {reports_df['description'].values[ii]}")
+            print(f"Title: {reports_df['display_name'].values[ii]}")
+            print()
+            import sys
+            sys.exit("Exiting the script.")
+
     reports_df["character_count"] = reports_df["content"].map(len)
+
     # reports_df["character_count"] = len(reports_df["content"])
     reports_df["source"] = "https://wandb.ai" + reports_df["report_path"]
 
@@ -318,24 +343,26 @@ def main(args):
 
     reports_df.to_json(OUTPUT_FILE, orient='records', lines=True)
 
-    ### Push to W&B 
-    wandb.init(name="upload_fully_connected_reports",
-               project='wandbot_public',
-               entity='wandbot',
-               job_type='upload_fc_reports')
-    tbl = wandb.Table(dataframe=reports_df)  # reports_df.iloc[:50,:])
+    skip_wandb = True
+    if not skip_wandb:
+        ### Push to W&B 
+        wandb.init(name="upload_fully_connected_reports",
+                project='wandbot_public',
+                entity='wandbot',
+                job_type='upload_fc_reports')
+        tbl = wandb.Table(dataframe=reports_df)  # reports_df.iloc[:50,:])
 
-    artifact = wandb.Artifact('fc-markdown-reports', type='fully-connected-dataset')
-    artifact.add_file(OUTPUT_FILE) #, 'fc-markdown-reports')
-    wandb.log_artifact(artifact)
-    wandb.log({"reports4": tbl})
+        artifact = wandb.Artifact('fc-markdown-reports', type='fully-connected-dataset')
+        artifact.add_file(OUTPUT_FILE) #, 'fc-markdown-reports')
+        wandb.log_artifact(artifact)
+        wandb.log({"reports4": tbl})
 
 
 ####################################
 
 
 if __name__ == "__main__":
-
+    print("Starting...")
     parser = argparse.ArgumentParser(description='Get Fully Connected Reports from BigQuery')
     parser.add_argument('--refresh_data', 
         action='store_true', 
