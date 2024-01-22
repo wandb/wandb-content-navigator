@@ -73,7 +73,7 @@ async def handle_app_mentions(event, say, logger):
         for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
             # fix links that have spaces
             # logger.info(f"Source pre: {source}")
-            source = quote({str(source)})
+            source = quote(str(source))
             # logger.info(f"Source post: {source}")
             # Show more info in debug mode
             if '--debug' not in user_query:
