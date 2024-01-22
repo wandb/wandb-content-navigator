@@ -77,7 +77,7 @@ async def handle_app_mentions(event, say, logger):
             # logger.info(f"Source post: {source}")
             # Show more info in debug mode
             if '--debug' not in user_query:
-                slack_text += f"• {explanation.content_description} - {source}*\n\n" # *<{source}|Link>*\n\n"
+                slack_text += f"• {explanation.content_description} - '{source}'*\n\n" # *<{source}|Link>*\n\n"
             else:
                 slack_text += f"score: {score}, Source: {source}\nreason_why_helpful: {explanation.reason_why_helpful}\n\
     content_is_relevant: {explanation.content_is_relevant}\nDescription: {explanation.content_description}\n\n"
