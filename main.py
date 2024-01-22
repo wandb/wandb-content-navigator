@@ -132,12 +132,14 @@ class ExpandedQuery(BaseModel):
     '''Given a `query` from a user, expand on what the user may be looking for in order to make\
 a semantic search match more likely.'''
     chain_of_thought: str = Field(..., description="Think step by step about the types of machine learning content, \
-topcis and industries that the user may be looking for.")
-    expanded_query: str = Field(..., description="An expanded query that is more likely to match a semantic search based on the users `query`.")
+topcis and industries that the user may be looking for. Make sure not to focus too much on any specific companies \
+or entities mentioned in the query.")
+    expanded_query: str = Field(..., description="An expanded query of machine learning topics that is more likely \
+to match a semantic search based on the users `query`.")
 
 async def expand_query(query):
     '''
-    Given a user query and a retrieved chunk, explain why the chunk is useful
+    Exapnd the user query to make a semantic search match more likely
     '''
     logging.debug('Calling OpenAI to expand the user query')
     user_prompt = EXPAND_USER_PROMPT.format(query=query)
@@ -167,8 +169,10 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
     expanded_query = await expand_query(query.query)
     query = Query(query=expanded_query.expanded_query)
-    logging.info(f"Expanded query: {query}")
-
+    logging.info(f"Expanded query: {expanded_query.expanded_query}")
+    if "--debug" in query.query:
+        logging.info(f"Expanded query CoT: {expanded_query.chain_of_thought}")
+    
     # Create API retrieval request
     formatted_request = APIRetrievalRequest(query=query.query,
                                 language=LANGUAGE,
