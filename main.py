@@ -167,6 +167,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
     expanded_query = await expand_query(query.query)
     query = expanded_query.expanded_query
+    logging.info(f"Expanded query: {query}")
 
     # Create API retrieval request
     formatted_request = APIRetrievalRequest(query=query,
