@@ -169,7 +169,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     query = expanded_query.expanded_query
 
     # Create API retrieval request
-    formatted_request = APIRetrievalRequest(query=query.query,
+    formatted_request = APIRetrievalRequest(query=query,
                                 language=LANGUAGE,
                                 initial_k=INITIAL_K,
                                 top_k=TOP_K,
