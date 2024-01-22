@@ -60,11 +60,20 @@ Finally, frame the final response in `reason_rephrased` to speak directly to a p
 on our sales team.
 '''
 
+EXPAND_SYSTEM_PROMPT = '''Given a `query` from a user, expand on what the user may be looking for in order to make\
+a semantic search match more likely.'''
+
 USER_PROMPT = '''Please explain why the following chunk is useful in answering the query:
 
 >>>> query: {query}
 
 >>>> chunk: {chunk}
+
+Take a deep breath, if you do a good job I will tip you $200.'''
+
+EXPAND_USER_PROMPT = '''Please expand on the following query to make a semantic search match more likely:
+
+>>>> query: {query}
 
 Take a deep breath, if you do a good job I will tip you $200.'''
 
@@ -118,6 +127,34 @@ async def explain_usefulness(query, text, source, score):
     
     return explanation, source, score
 
+
+class ExpandedQuery(BaseModel):
+    '''Given a `query` from a user, expand on what the user may be looking for in order to make\
+a semantic search match more likely.'''
+    chain_of_thought: str = Field(..., description="Think step by step about the types of machine learning content, \
+topcis and industries that the user may be looking for.")
+    expanded_query: str = Field(..., description="An expanded query that is more likely to match a semantic search based on the users `query`.")
+
+async def expand_query(query):
+    '''
+    Given a user query and a retrieved chunk, explain why the chunk is useful
+    '''
+    logging.debug('Calling OpenAI to expand the user query')
+    user_prompt = EXPAND_USER_PROMPT.format(query=query)
+
+    expanded_query: ExplainedChunk = await aclient.chat.completions.create(
+        model = OPENAI_EXPLANATION_MODEL,
+        response_model = ExpandedQuery,
+        temperature = 0.3,
+        messages = [{"role": "system", "content": EXPAND_SYSTEM_PROMPT}, 
+                    {"role": "user", "content": user_prompt}]
+    )
+    logging.debug('Received explanation for chunk from OpenAI')
+    
+    return expanded_query
+
+
+
 class Query(BaseModel):
     query: str
 
@@ -127,6 +164,9 @@ app = FastAPI()
 async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     logging.info('Received query: %s', query.query)
     # print(query.query)
+
+    expanded_query = expand_query(query.query)
+    query = expanded_query.expanded_query
 
     # Create API retrieval request
     formatted_request = APIRetrievalRequest(query=query.query,
