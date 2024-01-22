@@ -129,11 +129,12 @@ async def explain_usefulness(query, text, source, score):
 
 
 class ExpandedQuery(BaseModel):
-    '''Given a `query` from a user, expand on what the user may be looking for in order to make\
+    '''Given a `query` from a user, expand on what the user may be looking for in order to make \
 a semantic search match more likely.'''
-    chain_of_thought: str = Field(..., description="Think step by step about the types of machine learning content, \
-topcis and industries that the user may be looking for. Make sure not to focus too much on any specific companies \
-or entities mentioned in the query.")
+    chain_of_thought: str = Field(..., description="Think step by step about the given `query` and \
+associated machine learning and artificial intelligence topics, including industry applications, and \
+technological uses of ML and AI. Avoid concentrating excessively on any particular companies \
+or entities mentioned in the request.")
     expanded_query: str = Field(..., description="An expanded query of machine learning topics that is more likely \
 to match a semantic search based on the users `query`.")
 
