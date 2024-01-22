@@ -65,10 +65,10 @@ async def handle_app_mentions(event, say, logger):
     logger.info(f"RESPONSE: LEN: {len(cleaned_response)}, {cleaned_response}")
 
     ### SEND CONTENT SUUGESTIONS BACK TO SLACK USER ###
-    slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
     if len(cleaned_response) == 0:
-            slack_text += "No content suggestions found. Try rephrasing your query."
+        slack_text = f"Hey <@{user}>, no content suggestions found. Try rephrasing your query."
     else:
+        slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
         for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
             # Show more info in debug mode
             if '--debug' not in user_query:
