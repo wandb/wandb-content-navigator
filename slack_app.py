@@ -92,7 +92,7 @@ async def handle_app_mentions(event, say, logger):
     if '--debug' in user_query:
         rejected_responses = [(explanation, source, score) for explanation, source, score in response if explanation.content_is_relevant is not True]
         for explanation, source, score in rejected_responses:
-            source = unquote(quote(str(source)))
+            source = source.replace(' ', '%20')
             slack_response = f"REJECTED, *Score*: {score}, *Source*: {source}\n*reason_why_helpful*:\
 {explanation.reason_why_helpful}\n*chain_of_thought*: {explanation.chain_of_thought}\n\
 *content_is_relevant*: {explanation.content_is_relevant}\n*content_description*: {explanation.content_description}\n\n"
