@@ -157,7 +157,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     for s,c in sorted_source_counts:
         logging.info(f"{s}: {c}")
     multiple_source_citations = list(set(source for source, count in sorted_source_counts if count > 1))
-    logging.info(f"{len(multiple_source_citations)} sources were retrieved more than once.")
+    logging.info(f"After filtering, {len(multiple_source_citations)} sources were retrieved more than once.")
 
     # Merge chunks from the same source
     if len(multiple_source_citations) > 0:
