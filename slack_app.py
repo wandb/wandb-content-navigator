@@ -75,11 +75,11 @@ async def handle_app_mentions(event, say, logger):
         for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
             # fix links that have spaces
             # logger.info(f"Source pre: {source}")
-            source = quote(str(source))
+            source = unquote(quote(str(source)))
             # logger.info(f"Source post: {source}")
             # Show more info in debug mode
             if '--debug' not in user_query:
-                slack_text += f"• {explanation.content_description} - <{unquote(source)}|Link> \n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
+                slack_text += f"• {explanation.content_description} - <{source}|Link>\n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
             else:
                 slack_text += f"*Score*: {score}, *Source*: {source}\n*reason_why_helpful*:\
 {explanation.reason_why_helpful}\n*chain_of_thought*: {explanation.chain_of_thought}\n\
@@ -92,6 +92,7 @@ async def handle_app_mentions(event, say, logger):
     if '--debug' in user_query:
         rejected_responses = [(explanation, source, score) for explanation, source, score in response if explanation.content_is_relevant is not True]
         for explanation, source, score in rejected_responses:
+            source = unquote(quote(str(source)))
             slack_response = f"REJECTED, *Score*: {score}, *Source*: {source}\n*reason_why_helpful*:\
 {explanation.reason_why_helpful}\n*chain_of_thought*: {explanation.chain_of_thought}\n\
 *content_is_relevant*: {explanation.content_is_relevant}\n*content_description*: {explanation.content_description}\n\n"
