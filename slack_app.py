@@ -62,17 +62,20 @@ async def handle_app_mentions(event, say, logger):
     cleaned_response = [(explanation, source, score) for explanation, source, score in response if explanation.content_is_relevant is True]
     logger.info(f"{len_explanations - len(cleaned_response)} pieces of content found to be irrelevant and removed")
 
+    logger.info(f"RESPONSE: LEN: {len(cleaned_response)}, {cleaned_response}")
+
     ### SEND CONTENT SUUGESTIONS BACK TO SLACK USER ###
     slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
-    for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
-        # Show more info in debug mode
-        if len(cleaned_response) == 0:
+    if len(cleaned_response) == 0:
             slack_text += "No content suggestions found. Try rephrasing your query."
-        if '--debug' not in user_query:
-            slack_text += f"• {explanation.content_description} - *<{source}|Link>*\n\n"
-        else:
-            slack_text += f"score: {score}, Source: {source}\nreason_why_helpful: {explanation.reason_why_helpful}\n\
-content_is_relevant: {explanation.content_is_relevant}\nDescription: {explanation.content_description}\n\n"
+    else:
+        for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
+            # Show more info in debug mode
+            if '--debug' not in user_query:
+                slack_text += f"• {explanation.content_description} - *<{source}|Link>*\n\n"
+            else:
+                slack_text += f"score: {score}, Source: {source}\nreason_why_helpful: {explanation.reason_why_helpful}\n\
+    content_is_relevant: {explanation.content_is_relevant}\nDescription: {explanation.content_description}\n\n"
     
     await say(slack_text, channel=SLACK_CHANNEL_ID, thread_ts=ts)
     logger.info(f"Sent message: {slack_text}")
