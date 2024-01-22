@@ -6,6 +6,45 @@ from tqdm import tqdm
 from google.cloud import bigquery
 
 
+def clean_text(text):
+    '''
+    clean up invalid unicode escape sequences
+    '''
+    # List of common escape sequences to retain
+    common_escapes = ['\\n', '\\t', '\\r', '\\\\', '\\\'', '\\"']
+
+    # Replace each uncommon escape sequence with a space or other character
+    for i in range(256):
+        escape_sequence = f'\\{chr(i)}'
+        if escape_sequence not in common_escapes:
+            text = text.replace(escape_sequence, '  ')  # replace with a space or any character of your choice
+            text = text.replace('\ ', ' ')  # in case an invalid escape sequence was created above
+
+    return text
+
+def clean_unicode_escapes(text):
+    try:
+        # Try to decode using the 'unicode_escape' codec
+        return text.encode('raw_unicode_escape').decode('unicode_escape')
+    
+    except UnicodeDecodeError as e:
+        print(e)
+        # If an error occurs, find the position of the error
+        error_pos = e.args[2]
+        # print(text[error_pos])
+        # print(text)
+        return text
+
+
+def clean_text(text):
+    # Replace backslashes with double backslashes, except for known escape sequences
+    escapes = ['\\n', '\\t', '\\r', '\\b', '\\f', '\\\'', '\\"', '\\a', '\\v']
+    for esc in escapes:
+        text = text.replace(esc, esc.replace('\\', '\\\\'))
+    text = text.replace('\\', '\\\\').replace('\\\\', '\\', 1)
+    return text
+
+
 def get_reports_ids():
     client = bigquery.Client(project='wandb-production')
 
@@ -234,7 +273,6 @@ def main(args):
 
         fc_ids_df = extract_fc_report_ids(fc_spec_df)
 
-
         ### Filter report IDs down to just Fully Connected reports using the IDs from fc_ids_df
         print(f"Before filtering, there are {len(report_ids_df)} reports")
 
@@ -270,8 +308,8 @@ def main(args):
     
     else:
         reports_df = pd.read_json('raw_reports_data.jsonl', lines=True)
-        print(reports_df.head())
-        print(reports_df.columns)
+        # print(reports_df.head())
+        # print(reports_df.columns)
 
 
     ### Process reports text to markdown
@@ -297,7 +335,6 @@ def main(args):
                                                         row['report_id'],
                                                         row['display_name']
                                                         )
-            
             markdown_ls.append(markdown)
             buggy_report_ids.append(buggy_report_id)
             spec_type_ls.append(spec_type)
@@ -309,10 +346,22 @@ def main(args):
             else:
                 is_short_report_ls.append(False)
 
+    # clean the markdown for any rogue unicode escape sequences
+    markdown_ls_tmp = []
+    for m in markdown_ls:
+        m = clean_text(m)
+        markdown_ls_tmp.append(m)
+    print('DONE')
+    # Check that the cleaning worked
+    for m in markdown_ls_tmp:
+        clean_unicode_escapes(m)
+    markdown_ls = markdown_ls_tmp
+
     reports_df['markdown_text'] = markdown_ls
     reports_df['spec_type'] = spec_type_ls
     reports_df['is_buggy'] = is_buggy_ls
     reports_df['is_short_report'] = is_short_report_ls
+
 
     reports_df["content"] = "\n# " + reports_df["display_name"] + "\n\nDescription: " + reports_df["description"] + "\n\nBody:\n\n" + reports_df['markdown_text'].astype(str)
     

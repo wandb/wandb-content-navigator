@@ -66,6 +66,8 @@ async def handle_app_mentions(event, say, logger):
     slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
     for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
         # Show more info in debug mode
+        if len(cleaned_response) == 0:
+            slack_text += "No content suggestions found. Try rephrasing your query."
         if '--debug' not in user_query:
             slack_text += f"• {explanation.content_description} - *<{source}|Link>*\n\n"
         else:
