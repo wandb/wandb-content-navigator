@@ -167,8 +167,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
             chunks_to_merge = [chunk for chunk in cleaned_chunks if chunk["metadata"]["source"] == source]
             for c in chunks_to_merge:
                 logging.info(f"Source: {c['metadata']['source']}, chunk length: {len(c['text'])}, chunk content:")
-                for i in range(0, len(c['text']), 60):  # Adjust the chunk size as needed
-                    logging.info(c['text'][i:i+60])
+                logging.info(c['text'])
                 logging.info("END END END/n/n/n")
             logging.info(f"Number of chunks_to_merge: {len(chunks_to_merge)}")
             merged_text = "\n...\n".join([chunk["text"] for chunk in chunks_to_merge])
