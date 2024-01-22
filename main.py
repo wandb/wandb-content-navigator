@@ -147,7 +147,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "ml-news" not in chunk["metadata"]["source"].lower()]
     # Temp remove this source: 
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
-    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to language or'ml-news' source.")
+    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to language or'ml-news' or bad data source.")
 
     ### MERGING REPEATEDLY CITED SOURCES ###
     # Check if a source if retrieved more than once from the TOP_K retrieved sources, merge them if so
