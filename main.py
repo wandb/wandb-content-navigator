@@ -45,8 +45,8 @@ OPENAI_EXPLANATION_MODEL = "gpt-4-1106-preview"
 # OPENAI_EXPLANATION_MODEL = "gpt-3.5-turbo-1106"
 
 QUERY = 'do we have any reports I could send to a finance company?'
-TOP_K = 10
-INITIAL_K = 30
+TOP_K = 15
+INITIAL_K = 50
 LANGUAGE = 'en'
 INCLUDE_TAGS = ['fc-reports']
 REGEX_SEARCH = r'[^\x00-\x7F]'
