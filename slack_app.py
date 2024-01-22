@@ -73,10 +73,10 @@ async def handle_app_mentions(event, say, logger):
     else:
         slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
         for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
+            # source = unquote(quote(str(source)))
             # fix links that have spaces
-            # logger.info(f"Source pre: {source}")
-            source = unquote(quote(str(source)))
-            # logger.info(f"Source post: {source}")
+            source = source.replace(' ', '%20')
+
             # Show more info in debug mode
             if '--debug' not in user_query:
                 slack_text += f"• {explanation.content_description} - <{source}|Link>\n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
