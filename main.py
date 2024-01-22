@@ -169,13 +169,13 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     # print(query.query)
 
     expanded_query = await expand_query(query.query)
-    query = Query(query=expanded_query.expanded_query)
-    logging.info(f"Expanded query: {expanded_query.expanded_query}")
+    retriever_query = Query(query=expanded_query.expanded_query)
+    logging.info(f"Expanded retriever query: {expanded_query.expanded_query}")
     if "--debug" in query.query:
         logging.info(f"Expanded query CoT: {expanded_query.chain_of_thought}")
     
     # Create API retrieval request
-    formatted_request = APIRetrievalRequest(query=query.query,
+    formatted_request = APIRetrievalRequest(query=retriever_query.query,
                                 language=LANGUAGE,
                                 initial_k=INITIAL_K,
                                 top_k=TOP_K,
