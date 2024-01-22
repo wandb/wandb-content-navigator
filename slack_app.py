@@ -3,7 +3,7 @@ import re
 import asyncio
 import logging
 from typing import List, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -77,7 +77,7 @@ async def handle_app_mentions(event, say, logger):
             # logger.info(f"Source post: {source}")
             # Show more info in debug mode
             if '--debug' not in user_query:
-                slack_text += f"• {explanation.content_description} - <{str(source)}|Link> \n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
+                slack_text += f"• {explanation.content_description} - <{unquote(source)}|Link> \n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
             else:
                 slack_text += f"score: {score}, Source: {source}\nreason_why_helpful: {explanation.reason_why_helpful}\n\
     content_is_relevant: {explanation.content_is_relevant}\nDescription: {explanation.content_description}\n\n"
