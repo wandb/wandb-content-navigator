@@ -32,7 +32,8 @@ logging.basicConfig(level=logging.INFO)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 aclient = instructor.apatch(AsyncOpenAI(api_key = OPENAI_API_KEY))
 
-ENDPOINT = "https://wandbot-dev.replit.app/retrieve"
+# ENDPOINT = "https://wandbot-dev.replit.app/retrieve"
+ENDPOINT = "https://wandbot.replit.app/retrieve"
 HEADERS = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
