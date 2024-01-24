@@ -46,7 +46,10 @@ async def handle_app_mentions(event, say, logger):
     # event_type = event.get("type")
     # event_ts = event.get("event_ts")
     # channel = event.get("channel")
-    
+
+    # Send initial response to the user
+    await say(f"Working on it :D", channel=SLACK_CHANNEL_ID, thread_ts=ts)
+
     # Get content suggestions
     logger.info("Retrieving content suggestions...")
     # Remove --debug from query if present
@@ -73,13 +76,12 @@ async def handle_app_mentions(event, say, logger):
     else:
         slack_text = f"Hey <@{user}>, content suggestions below:\n\n"
         for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
-            # source = unquote(quote(str(source)))
             # fix links that have spaces
             source = source.replace(' ', '%20')
 
             # Show more info in debug mode
             if '--debug' not in user_query:
-                slack_text += f"• {explanation.content_description} - <{source}|Link>\n\n" #*{source}*\n\n" # *<{source}|Link>*\n\n"
+                slack_text += f"• {explanation.content_description} - <{source}|Link>\n\n"
             else:
                 slack_text += f"*Score*: {score}, *Source*: {source}\n*reason_why_helpful*:\
 {explanation.reason_why_helpful}\n*chain_of_thought*: {explanation.chain_of_thought}\n\
@@ -97,14 +99,6 @@ async def handle_app_mentions(event, say, logger):
 {explanation.reason_why_helpful}\n*chain_of_thought*: {explanation.chain_of_thought}\n\
 *content_is_relevant*: {explanation.content_is_relevant}\n*content_description*: {explanation.content_description}\n\n"
             await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
-        # logger.info(f"Sent message: {slack_response}")
-
-
-    # else:
-    #     await say(f"There was an issue with processing source: {source}",
-    #         channel=SLACK_CHANNEL_ID,
-    #         thread_ts=ts)
-    #     logger.error(f"There was an issue with processing source: {source}")
 
 async def main():
     handler = AsyncSocketModeHandler(app, SLACK_APP_TOKEN)
