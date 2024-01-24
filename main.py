@@ -90,7 +90,7 @@ async def expand_query(query):
     expanded_query: ExplainedChunk = await aclient.chat.completions.create(
         model = OPENAI_EXPLANATION_MODEL,
         response_model = ExpandedQuery,
-        temperature = 0.3,
+        temperature = 0.1,
         messages = [{"role": "system", "content": EXPAND_SYSTEM_PROMPT}, 
                     {"role": "user", "content": user_prompt}]
     )
