@@ -143,15 +143,17 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
 
-    # Remove chunks from Gradient Dissent podcase 
+    # Remove chunks from Gradient Dissent podcast
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
     n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
 
-    # Temp remove this dodgy: 
+    # Temporary, remove this dodgy source:
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
     n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to bad data source.")
+    logging.info(f"After initial filer, there are {len(cleaned_chunks)} chunks in cleaned_chunks.")
+
 
     ### MERGING REPEATEDLY CITED SOURCES ###
     # Check if a source if retrieved more than once from the TOP_K retrieved sources, merge them if so
@@ -181,7 +183,7 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
         cleaned_chunks = [chunk for chunk in cleaned_chunks if chunk["metadata"]["source"] not in multiple_source_citations]
         cleaned_chunks.extend(merged_chunks)
     
-    # Convert all scores to lit to handle case when multiple scores are returned due to chunks being merged
+    # Convert all scores to list to handle case when multiple scores are returned due to chunks being merged
     cleaned_chunks = [dict(chunk, score=[chunk["score"]]) if not isinstance(chunk["score"], list) else chunk for chunk in cleaned_chunks]        
     logging.info(f"{len(cleaned_chunks)} chunks in cleaned_chunks after checking for multiple sources.")
 
