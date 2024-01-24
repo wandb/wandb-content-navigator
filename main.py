@@ -46,7 +46,8 @@ QUERY = 'do we have any reports I could send to a finance company?'
 TOP_K = 30
 INITIAL_K = 80
 LANGUAGE = 'en'
-INCLUDE_TAGS = ['fc-reports']
+INCLUDE_TAGS = ['contains-wandb-code']
+EXCLUDE_TAGS = ['ml-news', 'gradient-dissent']
 NON_ENGLISH_REGEX_SEARCH = r'[^\x00-\x7F]'
 
 
