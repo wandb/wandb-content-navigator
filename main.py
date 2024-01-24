@@ -143,10 +143,10 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
 
-    # Remove chunks from Gradient Dissent podcast
-    cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
-    n_cleaned_chunks = len(cleaned_chunks)
-    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
+    # # Remove chunks from Gradient Dissent podcast
+    # cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
+    # n_cleaned_chunks = len(cleaned_chunks)
+    # logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
 
     # Temporary, remove this dodgy source:
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
