@@ -6,12 +6,12 @@ authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.10.0,<3.12"
-pydantic = "^2.5.2"
-openai = "^1.3.6"
-instructor = "^0.4.6"
-uvicorn = "^0.23.2"
-pandas = "^1.5.3"
-fastapi = "^0.104.1"
+pydantic = "^2.5.3"
+openai = "^1.9.0"
+instructor = "^0.4.8"
+uvicorn = "^0.27.0"
+pandas = "^2.2.0"
+fastapi = "^0.109.0"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
