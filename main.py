@@ -130,8 +130,6 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
     ### FILTERING ###
 
-    # TODO: Filter out Gradient Dissent Interviews
-
     n_retrieved_responses = len(retriever_response["top_k"])
     # Remove chunks than contain non-english characters
     cleaned_chunks = [d for d in retriever_response["top_k"] if not re.search(REGEX_SEARCH, d["text"])]
@@ -140,18 +138,20 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
     # Remove chunks from ML-News
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "ml-news" not in chunk["metadata"]["source"].lower()]
-    n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
+    n_cleaned_chunks = len(cleaned_chunks)
 
-    # # Remove chunks from Gradient Dissent podcast
-    # cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
-    # n_cleaned_chunks = len(cleaned_chunks)
-    # logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
+    # Remove chunks from Gradient Dissent podcast
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
+    n_cleaned_chunks = len(cleaned_chunks)
 
     # Temporary, remove this dodgy source:
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
-    n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to bad data source.")
+    n_cleaned_chunks = len(cleaned_chunks)
+
+    
     logging.info(f"After initial filer, there are {len(cleaned_chunks)} chunks in cleaned_chunks.")
 
 
