@@ -129,6 +129,9 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     logging.info(f'{len(retriever_response["top_k"])} chunks retrieved from retrieval endpoint.')
 
     ### FILTERING ###
+
+    # TODO: Filter out Gradient Dissent Interviews
+
     n_retrieved_responses = len(retriever_response["top_k"])
     # Remove chunks than contain non-english characters
     cleaned_chunks = [d for d in retriever_response["top_k"] if not re.search(REGEX_SEARCH, d["text"])]
@@ -140,10 +143,15 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     n_cleaned_chunks = len(cleaned_chunks)
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
 
-    # Temp remove this source: 
+    # Remove chunks from Gradient Dissent podcase 
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
+    n_cleaned_chunks = len(cleaned_chunks)
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
+
+    # Temp remove this dodgy: 
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
     n_cleaned_chunks = len(cleaned_chunks)
-    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to bad data source.")
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to bad data source.")
 
     ### MERGING REPEATEDLY CITED SOURCES ###
     # Check if a source if retrieved more than once from the TOP_K retrieved sources, merge them if so
