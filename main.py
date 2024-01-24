@@ -43,11 +43,11 @@ OPENAI_EXPLANATION_MODEL = "gpt-4-1106-preview"
 # OPENAI_EXPLANATION_MODEL = "gpt-3.5-turbo-1106"
 
 QUERY = 'do we have any reports I could send to a finance company?'
-TOP_K = 15
-INITIAL_K = 50
+TOP_K = 30
+INITIAL_K = 80
 LANGUAGE = 'en'
 INCLUDE_TAGS = ['fc-reports']
-REGEX_SEARCH = r'[^\x00-\x7F]'
+NON_ENGLISH_REGEX_SEARCH = r'[^\x00-\x7F]'
 
 
 def retrieve(user_request: APIRetrievalRequest) -> Dict:
@@ -99,6 +99,38 @@ async def expand_query(query):
     return expanded_query
 
 
+def filter_chunks(tok_k_responses: List[Dict]) -> List[Dict]:
+    '''
+    Filter out chunks based on sources that are not relevant to this task
+    '''
+
+    n_retrieved_responses = len(tok_k_responses)
+
+    # Remove chunks than contain non-english characters
+    cleaned_chunks = [d for d in tok_k_responses if not re.search(NON_ENGLISH_REGEX_SEARCH, d["text"])]
+    n_cleaned_chunks = len(cleaned_chunks)
+    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to language.")
+
+    # Remove chunks from ML-News
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if "ml-news" not in chunk["metadata"]["source"].lower()]
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
+    n_cleaned_chunks = len(cleaned_chunks)
+
+    # Remove chunks from Gradient Dissent podcast
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
+    n_cleaned_chunks = len(cleaned_chunks)
+
+    # Temporary, remove this dodgy source:
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to bad data source.")
+    n_cleaned_chunks = len(cleaned_chunks)
+
+    return cleaned_chunks
+
+
+### RUN THE APP
+
 app = FastAPI()
 
 @app.post("/get_content")
@@ -130,28 +162,9 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
     ### FILTERING ###
 
-    n_retrieved_responses = len(retriever_response["top_k"])
-    # Remove chunks than contain non-english characters
-    cleaned_chunks = [d for d in retriever_response["top_k"] if not re.search(REGEX_SEARCH, d["text"])]
-    n_cleaned_chunks = len(cleaned_chunks)
-    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to language.")
+    cleaned_chunks = filter_chunks(retriever_response["top_k"])
 
-    # Remove chunks from ML-News
-    cleaned_chunks = [chunk for chunk in cleaned_chunks if "ml-news" not in chunk["metadata"]["source"].lower()]
-    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'ml-news'")
-    n_cleaned_chunks = len(cleaned_chunks)
 
-    # Remove chunks from Gradient Dissent podcast
-    cleaned_chunks = [chunk for chunk in cleaned_chunks if "wandb_fc/gradient-dissent" not in chunk["metadata"]["source"].lower()]
-    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to 'gradient-dissent'")
-    n_cleaned_chunks = len(cleaned_chunks)
-
-    # Temporary, remove this dodgy source:
-    cleaned_chunks = [chunk for chunk in cleaned_chunks if "stacey/estuary/reports/--Vmlldzo1MjEw" not in chunk["metadata"]["source"]]
-    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to bad data source.")
-    n_cleaned_chunks = len(cleaned_chunks)
-
-    
     logging.info(f"After initial filer, there are {len(cleaned_chunks)} chunks in cleaned_chunks.")
 
 
