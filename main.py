@@ -43,8 +43,8 @@ OPENAI_EXPLANATION_MODEL = "gpt-4-1106-preview"
 # OPENAI_EXPLANATION_MODEL = "gpt-3.5-turbo-1106"
 
 QUERY = 'do we have any reports I could send to a finance company?'
-TOP_K = 30
-INITIAL_K = 80
+TOP_K = 10
+INITIAL_K = 100
 LANGUAGE = 'en'
 INCLUDE_TAGS = ['contains-wandb-code']
 EXCLUDE_TAGS = ['ml-news', 'gradient-dissent']
@@ -107,10 +107,15 @@ def filter_chunks(tok_k_responses: List[Dict]) -> List[Dict]:
 
     n_retrieved_responses = len(tok_k_responses)
 
-    # Remove chunks than contain non-english characters
-    cleaned_chunks = [d for d in tok_k_responses if not re.search(NON_ENGLISH_REGEX_SEARCH, d["text"])]
+    # Remove dummy chunnks returned when there are no results
+    cleaned_chunks = [chunk for chunk in tok_k_responses if "no-result" not in chunk["metadata"]["source"].lower()]
     n_cleaned_chunks = len(cleaned_chunks)
-    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to language.")
+    logging.info(f"{n_retrieved_responses - len(cleaned_chunks)} sources were filtered out due to dummy, no-result chunk returned")
+
+    # Remove chunks than contain non-english characters
+    cleaned_chunks = [chunk for chunk in cleaned_chunks if not re.search(NON_ENGLISH_REGEX_SEARCH, chunk["text"])]
+    logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} sources were filtered out due to language.")
+    n_cleaned_chunks = len(cleaned_chunks)
 
     # Remove chunks from ML-News
     cleaned_chunks = [chunk for chunk in cleaned_chunks if "ml-news" not in chunk["metadata"]["source"].lower()]
