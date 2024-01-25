@@ -155,7 +155,9 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
                                 language=LANGUAGE,
                                 initial_k=INITIAL_K,
                                 top_k=TOP_K,
-                                include_tags=INCLUDE_TAGS)
+                                include_tags=INCLUDE_TAGS,
+                                exclude_tags=EXCLUDE_TAGS,
+                                )
 
     # Retrieve response
     retriever_response: Dict = retrieve(formatted_request)
