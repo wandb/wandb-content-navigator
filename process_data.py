@@ -294,7 +294,7 @@ def get_entity_count(text: str = ""):
     """
     Get the count of entities from a given text
     """
-    print("\nchecking entity count...")
+    # print("\nchecking entity count...")
     entities: CountEntities = client.chat.completions.create(
         model=FAST_MODEL_NAME,
         temperature=0.0,
@@ -417,12 +417,15 @@ async def summarize_article(
         "index": idx,
         "has_error": has_error,
         }
-    wandb.log(result)
+    
+    for r in result:
+        wandb_result = {f"report-summarisation-progress/{r}": result[r]}
+
+    wandb.log(wandb_result)
     queue.put(result)
     return summary_chain, source
 
 async def write_results(filename):
-    print("WRITING!")
     while True:
         result = await queue.get()
         with open(filename, 'a', encoding="utf-8") as f:
@@ -468,7 +471,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL_NAME = 'gpt-4-0125-preview' #'gpt-4-1106-preview'
 FAST_MODEL_NAME = 'gpt-3.5-turbo-1106'  # upgrade to gpt-3.5-turbo-0125 when available
 N_SUMMARY_STEPS = 2
-MAX_ROWS = 10
+MAX_ROWS = 10000
 DATA_DIR = "data"
 
 aclient = AsyncOpenAI(api_key = OPENAI_API_KEY)
@@ -480,6 +483,7 @@ client = instructor.patch(client)
 # Get data
 # Filter out ml-news, gradient-dissent, and announcement articles
 FILTERS = ["ml-news", "gradient-dissent", "announcement"]
+
 if "ml-news" in FILTERS:
     df = df[df.is_ml_news == False]
 if "gradient-dissent" in FILTERS:
@@ -524,7 +528,7 @@ summaries = asyncio.run(
     )
 )
 
-print(f"{len(summaries)} summaries generated.")
+print(f"\n{len(summaries)} summaries generated!\n")
 
 # create variables from the summaries
 final_summaries = [summary_chain[-1][0] for summary_chain, source in summaries]
@@ -552,3 +556,4 @@ summary_df = pd.DataFrame(summary_data)
 summary_df.to_csv(f'{DATA_DIR}/summary_df_{timestamp}.csv', index=False)
 
 wandb.log({"fc-report-summaries/summary_df": wandb.Table(dataframe=summary_df)})
+wandb.finish()
