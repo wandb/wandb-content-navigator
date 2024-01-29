@@ -167,7 +167,8 @@ class CountEntities(BaseModel):
     """
     chain_of_thought: str = Field(
         ...,
-        description=f"Think step by step about how many entities are in the given `text`. {ENTITY_DEFINITION}",
+        description=f"Think step by step about how many entities are in the given `text`. {ENTITY_DEFINITION}.\
+keep it short.",
     )
     entities: List[Entity] = Field(
         ...,
@@ -220,8 +221,8 @@ from this `new_summary`.",
         num_tokens = len(tokens)
         if num_tokens < 60:
             raise ValueError(
-                "The current summary is too short. Please make sure that you generate a new summary \
-    that is around 80 words long."
+                "The current summary is too short. Please make sure that you generate a `new_summary` \
+that is around 80 words long."
             )
         return v
     
@@ -234,14 +235,15 @@ from this `new_summary`.",
         entities: CountEntities = get_entity_count(v)
         num_entities = entities.num_entities
         density = num_entities / num_tokens
-        print(f"Entity chain of thought: {entities.chain_of_thought}")
-        print(f"Entities: {entities.entities}")
+        # print(f"Entity chain of thought: {entities.chain_of_thought}")
+        # print(f"Entities: {entities.entities}")
         print(f"{num_entities} entities found in summary, entity density: {density}")
 
         if density < 0.08:
             raise ValueError(
-                f"The `new_summary`: {v}, has too few entities. Please regenerate a `new_summary` with more \
-new entities added to it."
+                f"This is the `new_summary` that was generated: ```{v}```\n\n\
+The entity denisty of `new_summary` is too low, i.e. it has has too few Entities vs. the total word \
+count. Please regenerate a better `new_summary` with more Entities added to it and a higher entity density."
             )
         return v
 
@@ -249,8 +251,8 @@ new entities added to it."
     def has_missing_entities(cls, missing_entities: List[str]):
         if len(missing_entities) == 0:
             raise ValueError(
-                "You must identify 1-3 informative Entities from the Article which are missing from \
-the `previous_summary` to be used in the `new_summary`"
+                "No Missing Entities were identified. Please identify 1-3 informative Entities \
+from the Article which are currently missing from the `previous_summary`."
             )
         return missing_entities
     
@@ -260,7 +262,7 @@ the `previous_summary` to be used in the `new_summary`"
         if len(absent_entities) > 0:
             print(f"Detected absent entities of {absent_entities}")
             raise ValueError(
-                f"Do not omit the following Entities {absent_entities} from the `new_summary`"
+                f"Do not omit the following Entities {absent_entities} from `new_summary`"
             )
         return absent_entities
 
@@ -275,7 +277,7 @@ def get_entity_count(text: str = ""):
         temperature=0.0,
         response_model=CountEntities,
         max_retries=3,
-        max_tokens=1000,
+        max_tokens=2000,
         messages=[
             {
                 "role": "system",
@@ -342,7 +344,7 @@ async def summarize_article(
                 temperature=0.5,
                 response_model=RewrittenSummary,
                 max_retries=5,
-                max_tokens=1300,
+                max_tokens=2000,
                 messages=[
                     {
                         "role": "system",
@@ -375,7 +377,7 @@ async def summarize_article(
             prev_summary = new_summary
     
     except Exception as e:
-        print(f"SUMMARISATION ERROR DESPITE RETRIES:\nException: {e}")
+        print(f"SUMMARISATION ERROR with {source} DESPITE RETRIES, Error:\n{e}")
         summary_chain = [(f"error - {e}", ["error"])] * summary_steps
 
     return summary_chain, source
@@ -412,8 +414,8 @@ aclient = instructor.patch(aclient)
 client = OpenAI(api_key = OPENAI_API_KEY)
 client = instructor.patch(client)
 
-articles = [df.page_content[0], df.page_content[1], df.page_content[2]]  # replace with your list of articles
-sources = [df.source[0], df.source[1], df.source[2]]  # replace with your list of sources
+articles = [df.page_content[0]] #, df.page_content[1], df.page_content[2]]  # replace with your list of articles
+sources = [df.source[0]] #, df.source[1], df.source[2]]  # replace with your list of sources
 
 summaries = asyncio.run(generate_summaries(
     articles = articles,
@@ -421,17 +423,16 @@ summaries = asyncio.run(generate_summaries(
     )
 )
 
-print(f"{len(summaries)} summaries in summary chain.")
-# print(f"SUMMARIES: {summaries}\n\n")
-print("printing summaries:\n")
-# for s in summaries[0]:
-#     print(s)
-#     print(f"{'*'*100}\n\n")
+print(f"{len(summaries)} summaries output, first item:")
+print(summaries[0])
+print()
+print()
 
 # create variables from the summaries
-final_summaries = [sum[0][-1][0] for sum in summaries]
-final_entities = [entity.entity for entity in sum[0][-1][1] for sum in summaries]
-sources = [sum[1] for sum in summaries]
+final_summaries = [summary_chain[-1][0] for summary_chain, source in summaries]
+# final_entities = [entity.entity for entity in summary_chain[-1][1] for summary_chain, source in summaries]
+final_entities = [entity.entity for summary_chain, source in summaries for entity in summary_chain[-1][1]]
+sources = [summary_chain[1] for summary_chain, source in summaries]
 
 print(f"{'*'*100}\n\n")
 print(f"FINAL SUMMARY: {final_summaries}")
