@@ -141,7 +141,7 @@ app = FastAPI()
 
 @app.post("/get_content")
 async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
-    logging.info('Received query: %s', query.query)
+    logging.info('\n\nReceived query: %s', query.query)
     # Strip any leading or trailing whitespace
     query.query = query.query.strip()
     # Remove any user tags like <@U06A6M92DM5> 
