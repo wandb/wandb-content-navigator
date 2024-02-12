@@ -1,1 +1,2 @@
-python slack_app.py
+(python slack_app.py) & \
+(python main.py)
