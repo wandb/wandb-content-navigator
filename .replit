@@ -12,8 +12,9 @@ language = "python3"
 
 [deployment]
 run = ["sh", "-c", "bash run.sh"]
+build = ["sh", "-c", "bash build.sh"]
 deploymentTarget = "gce"
 
 [[ports]]
-localPort=8000
+localPort=8008
 externalPort=80

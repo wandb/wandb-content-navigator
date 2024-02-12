@@ -5,7 +5,6 @@ import asyncio
 import logging
 import httpx
 from typing import List, Tuple
-from urllib.parse import quote, unquote
 
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -89,8 +88,6 @@ async def handle_app_mentions(event, say, logger):
     # Remove any sources that weren't considered useful
     cleaned_response = [(explanation, source, score) for explanation, source, score in response if explanation.content_is_relevant is True]
     logger.info(f"{len_explanations - len(cleaned_response)} pieces of content found to be irrelevant and removed")
-
-    logger.info(f"RESPONSE: LEN: {len(cleaned_response)}, {cleaned_response}")
 
     ### SEND CONTENT SUUGESTIONS BACK TO SLACK USER ###
     # Response if no content suggestions found
