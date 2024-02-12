@@ -1,17 +1,15 @@
 import os
 import logging
 
-# from pprint import pprint
 from typing import List, Tuple, Dict
 from collections import Counter
-# from pprint import pprint
 import numpy as np
 import asyncio
-import requests
 import re
 
-from fastapi import FastAPI
 import uvicorn
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
 from openai import AsyncOpenAI
 import instructor
@@ -24,6 +22,7 @@ from llm_utils import (
     EXPAND_SYSTEM_PROMPT,
     EXPAND_USER_PROMPT
 )
+from retriever import setup_langchain_retriever
 
 load_dotenv('.env')
 
@@ -32,14 +31,8 @@ logging.basicConfig(level=logging.INFO)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 aclient = instructor.apatch(AsyncOpenAI(api_key = OPENAI_API_KEY))
 
-# ENDPOINT = "https://wandbot-dev.replit.app/retrieve"
-ENDPOINT = "https://wandbot.replit.app/retrieve"
-HEADERS = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-}
 
-OPENAI_EXPLANATION_MODEL = "gpt-4-1106-preview"
+OPENAI_EXPLANATION_MODEL = "gpt-4-0125-preview"
 # OPENAI_EXPLANATION_MODEL = "gpt-3.5-turbo-1106"
 
 QUERY = 'do we have any reports I could send to a finance company?'
@@ -49,17 +42,6 @@ LANGUAGE = 'en'
 INCLUDE_TAGS = ['contains-wandb-code']
 EXCLUDE_TAGS = ['ml-news', 'gradient-dissent']
 NON_ENGLISH_REGEX_SEARCH = r'[^\x00-\x7F]'
-
-
-def retrieve(user_request: APIRetrievalRequest) -> Dict:
-    logging.debug('Sending request to retrieval endpoint')
-    response = requests.post(ENDPOINT,
-                             headers=HEADERS,
-                             data = user_request.model_dump_json(),
-                             timeout=600
-                             )
-    logging.debug('Received response from retrieval endpoint')
-    return response.json()
 
 
 async def explain_usefulness(query, text, source, score):
@@ -137,7 +119,74 @@ def filter_chunks(tok_k_responses: List[Dict]) -> List[Dict]:
 
 ### RUN THE APP
 
-app = FastAPI()
+# app = FastAPI()
+# # Define a global variable for the retriever
+# retriever = None
+# @app.on_event("startup")
+# async def startup_event():
+#     global retriever
+#     logging.info('Setting up Retriever...')
+#     # Initialize the retriever and assign it to the global variable
+#     retriever = setup_langchain_retriever()
+#     logging.info('Retriever setup complete.')
+
+
+
+retriever = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global retriever
+    # Load the ML model
+    # ml_models["answer_to_everything"] = fake_answer_to_everything_ml_model
+    logging.info('Setting up Retriever...')
+    retriever = setup_langchain_retriever()
+    logging.info('Retriever setup complete.')
+    yield
+    # Clean up and release the resources
+    # del retriever
+
+app = FastAPI(lifespan=lifespan)
+
+# this .get works
+# @app.get("/predict")
+# async def predict(x: float):
+#     # result = ml_models["answer_to_everything"](x)
+#     results = retriever.invoke("finance example")
+#     print(results)
+#     return {"result": results}
+
+
+# ####################
+# # DEBUGGING .post, but it works ok
+# from fastapi import FastAPI
+# from pydantic import BaseModel
+
+# class PredictRequest(BaseModel):
+#     x: float
+
+# @app.post("/predict")
+# async def predict(request: PredictRequest):
+#     results = retriever.invoke("finance example")
+#     print(results)
+#     return {"result": results}
+# ####################
+
+
+# # retriever = None
+
+# # # Define your async context manager for lifespan events
+# # @asynccontextmanager
+# # async def app_lifespan(app: FastAPI):
+# #     # Place your startup logic here
+# #     global retriever
+# #     retriever = setup_langchain_retriever()
+# #     yield  # The application is now running
+
+# # # Create your FastAPI app instance with the lifespan context manager
+# # app = FastAPI(lifespan=app_lifespan)
+
+
 
 @app.post("/get_content")
 async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
@@ -147,7 +196,11 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
     # Remove any user tags like <@U06A6M92DM5> 
     query.query = re.sub(r"\<@\w+\>", "", query.query).strip()
 
+    # results = retriever.invoke("finance example")
+    # print(f"RESULTS!!! {results}")
+
     ### RETRIEVAL ###
+
     # Expand the user query using OpenAI to make a retriever match more likely
     expanded_query = await expand_query(query.query)
     retriever_query = Query(query=expanded_query.expanded_query)
@@ -165,13 +218,13 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
                                 )
 
     # Retrieve response
-    retriever_response: Dict = retrieve(formatted_request)
+    # retriever_response: Dict = retrieve_from_wandbot(formatted_request)
+    retriever_response: Dict = retriever.invoke(formatted_request.query)
+    # retriever_response = retriever_response.
     logging.info(f'{len(retriever_response["top_k"])} chunks retrieved from retrieval endpoint.')
 
     ### FILTERING ###
-
     cleaned_chunks = filter_chunks(retriever_response["top_k"])
-
 
     logging.info(f"After initial filer, there are {len(cleaned_chunks)} chunks in cleaned_chunks.")
 
@@ -230,4 +283,4 @@ async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
 
 if __name__ == "__main__":
     logging.info('Running App')
-    uvicorn.run("main:app", host="localhost", port=8000, reload=True)
+    uvicorn.run("main:app", host="localhost", port=8008, reload=True)

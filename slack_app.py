@@ -1,7 +1,9 @@
 import os
 import re
+import json
 import asyncio
 import logging
+import httpx
 from typing import List, Tuple
 from urllib.parse import quote, unquote
 
@@ -23,6 +25,20 @@ N_SOURCES_TO_SEND = 10
 # CONTENT_SUGGESTIONS = f"Source: {source}\nreason_why_helpful: {explanation.reason_why_helpful}\n \
 # content_is_relevant: {explanation.content_is_relevant}\nDescription: {explanation.content_description}"
 
+def process_response(response) -> List[Tuple[ExplainedChunk, str]]:
+    '''
+    Convert httpx response to a list of tuples of ExplainedChunk and source as per
+    the api response format
+    '''
+    response = json.loads(response.text)
+    new_response = []
+    for item in response:
+        explained_chunk_dict, source, score = item  # Ignore the scores
+        explained_chunk = ExplainedChunk(**explained_chunk_dict)
+        new_response.append((explained_chunk, source, score))
+    return new_response
+
+
 app = AsyncApp(token=SLACK_BOT_TOKEN)
 
 @app.event("message")
@@ -39,7 +55,13 @@ async def handle_app_mentions(event, say, logger):
     # Get user query and remove the bot's @ handle 
     user_query = event.get('text')
     logger.info(f"Received user query: {user_query}")
-    user_query = re.sub(r"\<@\w+\>", "", user_query).strip()
+    
+    # Clean up user query
+    user_query = re.sub(r"\<@\w+\>", "", user_query).strip()  # Remove bot's @ handle
+    if '--debug' in user_query:  # Remove --debug from query if present
+        query = user_query.replace('--debug', '')
+    else:
+        query = user_query
 
     ts = event.get("ts")
     user = event.get('user')
@@ -52,14 +74,16 @@ async def handle_app_mentions(event, say, logger):
 
     # Get content suggestions
     logger.info("Retrieving content suggestions...")
-    # Remove --debug from query if present
-    if '--debug' in user_query:
-        query = user_query.replace('--debug', '')
-    else:
-        query = user_query
-    response: List[Tuple[ExplainedChunk, str]] = await process_query(Query(query=query))
+    # response: List[Tuple[ExplainedChunk, str]] = await process_query(Query(query=query))
+    async with httpx.AsyncClient(timeout=1200.0) as content_client:
+        response: List[Tuple[ExplainedChunk, str]] = await content_client.post(
+            "http://localhost:8008/get_content", 
+            json={"query": query}
+        )
+        response = process_response(response)
+
     len_explanations = len(response)
-    logger.info(f"{len_explanations} content explanations created.")
+    logger.info(f"{len_explanations} content suggestions created.")
 
     ### FILTER OUT SOURCES THAT THE MODEL THINKS ARE IRRELEVANT ###
     # Remove any sources that weren't considered useful

@@ -76,6 +76,14 @@ df["is_ml_news"] = df["source"].apply(lambda x: "ml-news" in x)
 df["is_gd"] = df["source"].apply(lambda x: "gradient-dissent" in x)
 df["is_announcement"] = df["source"].apply(lambda x: "announcement" in x)
 df["is_30_day_llm"] = df["source"].apply(lambda x: "30-days-of-llms" in x)
+df["is_russian"] = df["source"].apply(lambda x: "/russian/" in x)
+df["is_japanese"] = df["source"].apply(lambda x: "/japanese/" in x)
+df["is_korean"] = df["source"].apply(lambda x: "/korean/" in x)
+df["is_german"] = df["source"].apply(lambda x: "/german/" in x)
+df["is_french"] = df["source"].apply(lambda x: "/french/" in x)
+df["is_chinese"] = df["source"].apply(lambda x: "/chinese/" in x)
+df["is_seo"] = df["source"].apply(lambda x: "/seo/" in x)
+df["is_wb_tutorials"] = df["source"].apply(lambda x: "/wb-tutorials/" in x)
 
 # run = wandb.init(project='content-suggestor')
 # artifact = run.use_artifact('wandbot/wandbot_public/fc-markdown-reports:latest', type='fully-connected-dataset')
@@ -502,7 +510,9 @@ client = instructor.patch(client)
 
 # Get data
 # Filter out ml-news, gradient-dissent, and announcement articles
-FILTERS = ["ml-news", "gradient-dissent", "announcement"]
+FILTERS = ["ml-news", "gradient-dissent", "announcement",
+           "russian", "japanese", "korean", "german", 
+           "chinese", "french", "seo", "wb-tutorials"]
 
 if "ml-news" in FILTERS:
     df = df[df.is_ml_news == False]
@@ -512,6 +522,22 @@ if "announcement" in FILTERS:
     df = df[df.is_announcement == False]
 if "30-days-of-llms" in FILTERS:
     df = df[df.is_30_day_llm == False]
+if "russian" in FILTERS:
+    df = df[df.is_russian == False]
+if "korean" in FILTERS:
+    df = df[df.is_korean == False]
+if "japanese" in FILTERS:
+    df = df[df.is_japanese == False]
+if "chinese" in FILTERS:
+    df = df[df.is_chinese == False]
+if "french" in FILTERS:
+    df = df[df.is_french == False]
+if "german" in FILTERS:
+    df = df[df.is_german == False]
+if "seo" in FILTERS:
+    df = df[df.is_seo == False]
+if "wb-tutorials" in FILTERS:
+    df = df[df.is_seo == False]
 
 wandb.init(
     entity='morgan',
