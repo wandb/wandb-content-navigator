@@ -1,1 +1,2 @@
-poetry install --all-extras
+poetry lock --no-update && \
+poetry install --all-extras 
