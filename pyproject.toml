@@ -12,6 +12,8 @@ instructor = "^0.4.8"
 uvicorn = "^0.27.0"
 pandas = "^2.2.0"
 fastapi = "^0.109.0"
+langchain = "^0.1.6"
+
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
