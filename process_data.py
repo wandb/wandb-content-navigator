@@ -28,15 +28,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-SEMAPHORE_LIMIT = 20
 
-class Article(BaseModel):
-    use_case: str = Field(description="Use case covered in the report")
-    value_props: List[str] = Field(description="W&B value propositions covered in the report")
-    application: List[str] = Field(description="ML application covered in the report")
-    integrations: List[str] = Field(description="Integrations covered in the report")
-    summary: str = Field(description="Concise summary of the report")
-    audience: List[str] = Field(description="Target audience for the report")
+# class Article(BaseModel):
+#     use_case: str = Field(description="Use case covered in the report")
+#     value_props: List[str] = Field(description="W&B value propositions covered in the report")
+#     application: List[str] = Field(description="ML application covered in the report")
+#     integrations: List[str] = Field(description="Integrations covered in the report")
+#     summary: str = Field(description="Concise summary of the report")
+#     audience: List[str] = Field(description="Target audience for the report")
 
 
 def download_reports_data(output_dir: str = "reports_data", artifact_version: str="latest"):
@@ -52,6 +51,16 @@ reports_data_dir = "reports_data"
 # reports_data_dir = download_reports_data()
 df = pd.read_json(f'{reports_data_dir}/docstore_fc_reports/documents.jsonl', lines=True)
 
+# extract "source" from metadata in df
+df["source"] = df["metadata"].apply(lambda x: x["source"])
+
+# Exclude any reports that have already been summarised
+pre_filter_len = len(df)
+completed_df = pd.read_csv("20240131_sources_completed.csv")
+completed_sources = completed_df.sources.tolist()
+df = df[~df.source.isin(completed_sources)]
+print(f"{pre_filter_len - len(df)} reports already summarised and excluded from this run.")
+
 df["content_length"] = df["page_content"].apply(len)
 
 c  = []
@@ -60,8 +69,7 @@ for d in df["page_content"]:
 df["token_count"] = c
 print(df.nlargest(10, 'token_count')['token_count'])
 
-# extract "source" from metadata in df
-df["source"] = df["metadata"].apply(lambda x: x["source"])
+
 
 # add is_ml_news column if "ml-news" tag is present in source
 df["is_ml_news"] = df["source"].apply(lambda x: "ml-news" in x)
@@ -289,6 +297,8 @@ from the Article which are currently missing from the `previous_summary`."
             )
         return absent_entities
 
+SEMAPHORE_LIMIT = 10
+semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)  # Adjust the limit as needed
 
 def get_entity_count(text: str = ""):
     """
@@ -310,13 +320,12 @@ def get_entity_count(text: str = ""):
             {
                 "role": "user", 
                 "content": f"Here is the `text`: {text} \n\n please count the number of entities in the `text`",
-             }
+            }
         ],
     )
     return entities
 
-queue = asyncio.Queue()
-semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)  # Adjust the limit as needed
+# queue = asyncio.Queue()
 
 async def summarize_article(
     article: str,
@@ -331,6 +340,7 @@ async def summarize_article(
     async with semaphore:
         try:
             has_error = False
+            # error_message = ""
             # We first generate an initial summary
             summary: InitialSummary = await aclient.chat.completions.create(  
                 model=model_name,
@@ -356,53 +366,64 @@ async def summarize_article(
             # print(f"LEN SUMMARY CHAIN: {len(summary_chain)}")
             prev_summary = None
             for _ in range(summary_steps):
-                missing_entity_message = (
-                    []
-                    if prev_summary is None
-                    else [
-                        {
-                            "role": "user",
-                            "content": f"Please include these Entities that were missing \
-        from the `previous_summary`: {','.join(prev_summary.missing_entities)}",
-                        },
-                    ]
-                )
-                new_summary: RewrittenSummary = await aclient.chat.completions.create(
-                    model=model_name,
-                    temperature=0.5,
-                    response_model=RewrittenSummary,
-                    max_retries=5,
-                    max_tokens=2000,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": """You are going to generate an increasingly concise,entity-dense summary of the following article.
+                try: 
+                    missing_entity_message = (
+                        []
+                        if prev_summary is None
+                        else [
+                            {
+                                "role": "user",
+                                "content": f"Please include these Entities that were missing \
+            from the `previous_summary`: {','.join(prev_summary.missing_entities)}",
+                            },
+                        ]
+                    )
+                    new_summary: RewrittenSummary = await aclient.chat.completions.create(
+                        model=model_name,
+                        temperature=0.5,
+                        response_model=RewrittenSummary,
+                        max_retries=5,
+                        max_tokens=2000,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": """You are going to generate an increasingly concise,entity-dense summary of the following article.
 
-                        Perform the following two tasks
-                        - Given a `previous_summary`, write a new denser summary of identical length which covers every entity and detail from the previous_summary \
-        plus the Missing Entities
-                        - Identify 1-3 informative entities from the given article which are missing from the `previous_summary`
+                            Perform the following two tasks
+                            - Given a `previous_summary`, write a new denser summary of identical length which covers every entity and detail from the previous_summary \
+            plus the Missing Entities
+                            - Identify 1-3 informative entities from the given article which are missing from the `previous_summary`
 
-                        Guidelines
-                        - Make every word count: re-write the `previous_summary` to improve flow and make space for additional entities
-                        - Increase information density using fusion, compression, and removal of uninformative phrases like "the article discusses".
-                        - The `new_summary` should become highly dense and concise yet self-contained, i.e. easily understood without the Article.
-                        - Never drop entities from the `previous_summary`. If space cannot be made, add fewer new entities.
-                        """,
-                        },
-                        {
-                            "role": "user", 
-                            "content": f"Here is the `Article`:\n ```\n{article}\n```\n"},
-                        {
-                            "role": "user",
-                            "content": f"Here is the `previous_summary`:\n ```\n{summary_chain[-1]}\n```",
-                        },
-                        *missing_entity_message,
-                    ],
-                )
-                summary_chain.append((new_summary.new_summary, new_summary.entities))
-                # print(f"LEN SUMMARY CHAIN: {len(summary_chain)}")
-                prev_summary = new_summary
+                            Guidelines
+                            - Make every word count: re-write the `previous_summary` to improve flow and make space for additional entities
+                            - Increase information density using fusion, compression, and removal of uninformative phrases like "the article discusses".
+                            - The `new_summary` should become highly dense and concise yet self-contained, i.e. easily understood without the Article.
+                            - Never drop entities from the `previous_summary`. If space cannot be made, add fewer new entities.
+                            """,
+                            },
+                            {
+                                "role": "user", 
+                                "content": f"Here is the `Article`:\n ```\n{article}\n```\n"},
+                            {
+                                "role": "user",
+                                "content": f"Here is the `previous_summary`:\n ```\n{summary_chain[-1]}\n```",
+                            },
+                            *missing_entity_message,
+                        ],
+                    )
+                    summary_chain.append((new_summary.new_summary, new_summary.entities))
+                    # print(f"LEN SUMMARY CHAIN: {len(summary_chain)}")
+                    prev_summary = new_summary
+                except ValueError as e:
+                    print(f"Error generating new summary for article {idx}: {e}")
+                    summary_chain = [(f"error - {e}", [Entity(entity="error", index=0)])]
+                    has_error = True
+                    continue  # Skip to the next iteration
+                except asyncio.CancelledError:
+                    print(f"Task was cancelled for article: {idx}")
+                    summary_chain = [(f"error - {e}", [Entity(entity="error", index=0)])]
+                    has_error = True
+                    break  # Exit the loop
         
         except Exception as e:
             print(f"SUMMARISATION ERROR with {source} DESPITE RETRIES, Error:\n{e}")
@@ -416,22 +437,20 @@ async def summarize_article(
         "report_source": source,
         "index": idx,
         "has_error": has_error,
+        # "error_message": f"{error_message}"
         }
-    
-    for r in result:
-        wandb_result = {f"report-summarisation-progress/{r}": result[r]}
 
-    wandb.log(wandb_result)
-    queue.put(result)
+    wandb.log(result)
+    # queue.put(result)
     return summary_chain, source
 
-async def write_results(filename):
-    while True:
-        result = await queue.get()
-        with open(filename, 'a', encoding="utf-8") as f:
-            json.dump(result, f)
-            f.write('\n')
-        queue.task_done()
+# async def write_results(filename):
+#     while True:
+#         result = await queue.get()
+#         with open(filename, 'a', encoding="utf-8") as f:
+#             json.dump(result, f)
+#             f.write('\n')
+#         queue.task_done()
 
 async def generate_summaries(
     articles: List[str],
@@ -442,9 +461,9 @@ async def generate_summaries(
     Generate summaries for a list of articles
     '''
 
-    writer_task = asyncio.create_task(
-        write_results(filename)
-    )
+    # writer_task = asyncio.create_task(
+    #     write_results(filename)
+    # )
 
     tasks = [summarize_article(
         article=article,
@@ -456,11 +475,11 @@ async def generate_summaries(
     ]
     summaries: List[Tuple[List[Tuple[str, List[str]]], str]] = await asyncio.gather(*tasks)
 
-    # Wait for all data to be written to the file
-    await queue.join()
+    # # Wait for all data to be written to the file
+    # await queue.join()
 
-    # Cancel the consumer task
-    writer_task.cancel()
+    # # Cancel the consumer task
+    # writer_task.cancel()
 
     return summaries
 
@@ -473,6 +492,7 @@ FAST_MODEL_NAME = 'gpt-3.5-turbo-1106'  # upgrade to gpt-3.5-turbo-0125 when ava
 N_SUMMARY_STEPS = 2
 MAX_ROWS = 10000
 DATA_DIR = "data"
+
 
 aclient = AsyncOpenAI(api_key = OPENAI_API_KEY)
 aclient = instructor.patch(aclient)
@@ -555,5 +575,8 @@ summary_data = {
 summary_df = pd.DataFrame(summary_data)
 summary_df.to_csv(f'{DATA_DIR}/summary_df_{timestamp}.csv', index=False)
 
-wandb.log({"fc-report-summaries/summary_df": wandb.Table(dataframe=summary_df)})
+wandb.log({"fc-report-summaries/summary_df": 
+    wandb.Table(
+        columns=["final_summary", "final_entities", "source"],
+        dataframe=summary_df)})
 wandb.finish()
