@@ -1,15 +1,17 @@
-import re
 import logging
-import requests
 from typing import Dict
+
 import pandas as pd
-
+import requests
 from langchain_community.vectorstores import FAISS
+from langchain_core.runnables import (
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
+)
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel, RunnableLambda
-from langchain_core.output_parsers import BaseOutputParser
 
-from llm_utils import APIRetrievalResult,APIRetrievalRequest, APIRetrievalResponse
+from llm_utils import APIRetrievalRequest, APIRetrievalResponse, APIRetrievalResult
 
 # ENDPOINT = "https://wandbot-dev.replit.app/retrieve"
 ENDPOINT = "https://wandbot.replit.app/retrieve"
@@ -47,15 +49,6 @@ def process_langchain_retriever_output(langchain_retriever_response: Dict) -> AP
         query=langchain_retriever_response["question"], 
         top_k=results
     )
-
-# # Custom OutputParser for LangChain retriever output
-# class LangChainRetrieverOutputParser(BaseOutputParser):
-#     def parse(self, output: Dict) -> Dict:
-#         result: APIRetrievalResponse = process_langchain_retriever_output(output)
-#         return result.model_dump()
-    
-#     async def aparse(self, output: Dict) -> Dict:
-#         return await run_in_executor(None, self.parse, output)
 
 
 def setup_langchain_retriever(fc_summaries_filepath: str = "data/fully_connected_summaries_final.csv"):
