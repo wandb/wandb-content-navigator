@@ -101,6 +101,75 @@ sources were filtered out due to language.")
     return cleaned_chunks
 
 
+# def process_response(response) -> List[Tuple[ExplainedChunk, str]]:
+#     '''
+#     Convert httpx response to a list of tuples of ExplainedChunk and source as per
+#     the api response format
+#     '''
+#     response = json.loads(response.text)
+#     new_response = []
+#     for item in response:
+#         explained_chunk_dict, source, score = item  # Ignore the scores
+#         explained_chunk = ExplainedChunk(**explained_chunk_dict)
+#         new_response.append((explained_chunk, source, score))
+#     return new_response
+    
+
+def postprocess_retriever_response(
+        response: List[Tuple[ExplainedChunk, str, List]], 
+        username: str
+        debug_mode: bool
+        ) -> List(str, str):
+    ### FILTER OUT SOURCES THAT THE MODEL THINKS ARE IRRELEVANT ###
+    # Remove any sources that weren't considered useful
+    cleaned_response = [(explanation, source, score) for explanation, source, score in 
+    response if explanation.content_is_relevant is True]
+    logger.info(f"{len_explanations - len(cleaned_response)} pieces of content found to \
+be irrelevant and removed")
+
+    ### SEND CONTENT SUUGESTIONS BACK TO SLACK USER ###
+    # Response if no content suggestions found
+    if len(cleaned_response) == 0:
+        slack_response = f"Hey <@{username}>, no content suggestions found. Try rephrasing \
+your query."
+    # Response if content suggestions found
+    else:
+        slack_response = f"Hey <@{username}>, content suggestions below:\n\n"
+        for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
+            # fix links that have spaces
+            source = source.replace(' ', '%20')
+
+            # Show more info in debug mode
+            if '--debug' not in user_query:
+                slack_response += f"• {explanation.content_description} - <{source}|Link>\n\n"
+            else:
+                slack_response += f"*Score*: {score}, *Source*: {source}\n\
+*reason_why_helpful*: {explanation.reason_why_helpful}\n\
+*chain_of_thought*: {explanation.chain_of_thought}\n\
+*content_is_relevant*: {explanation.content_is_relevant}\n\
+*content_description*: {explanation.content_description}\n\n"
+    
+    # await say(slack_text, channel=SLACK_CHANNEL_ID, thread_ts=ts)
+    # logger.info(f"Sent message: {slack_text}")
+    
+    ### PRINT REJECTED SOURCES IN SLACK IN DEBUG MODE ###
+    debug_slack_response = ""
+    if debug_mode:
+        rejected_responses = [(explanation, source, score) for 
+        explanation, source, score in response if
+        explanation.content_is_relevant is not True]
+        for explanation, source, score in rejected_responses:
+            source = source.replace(' ', '%20')
+            debug_slack_response += f"REJECTED, *Score*: {score}, *Source*: {source}\n\
+*reason_why_helpful*: {explanation.reason_why_helpful}\n\
+*chain_of_thought*: {explanation.chain_of_thought}\n\
+*content_is_relevant*: {explanation.content_is_relevant}\n\
+*content_description*: {explanation.content_description}\n\n"
+            # await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
+
+    return slack_text, debug_slack_response
+
+
 ### RUN THE APP
 
 retriever = None
@@ -120,19 +189,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.post("/get_content")
-async def process_query(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
-    logging.info('\n\nReceived query: %s', query.query)
+async def get_content(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
+    logging.info('\n\nReceived query: %s from user: %s', query.query, query.username)
     # Strip any leading or trailing whitespace
     query.query = query.query.strip()
     # Remove any user tags like <@U06A6M92DM5> 
     query.query = re.sub(r"\<@\w+\>", "", query.query).strip()
+
+    if '--debug' in query.query:  # Remove --debug from query if present
+        query.query = query.query.replace('--debug', '')
+        debug_mode = True
+    else:
+        debug_mode = False
 
     ### RETRIEVAL ###
     # Expand the user query using OpenAI to make a retriever match more likely
     expanded_query = await expand_query(query.query)
     retriever_query = Query(query=expanded_query.expanded_query)
     logging.info(f"Expanded retriever query: {expanded_query.expanded_query}")
-    if "--debug" in query.query:
+    if debug_mode:
         logging.info(f"Expanded query CoT: {expanded_query.chain_of_thought}")
     
     # Create API retrieval request
@@ -209,9 +284,16 @@ sources were retrieved more than once.")
     # Sort explanations by score
     result.sort(key=lambda x: np.max(x[2]), reverse=True)
 
-    return result
+    # result = process_response(response)
+
+    slack_response, debug_slack_response = postprocess_retriever_response(
+        result, 
+        query.username
+    )
+
+    return slack_response, debug_slack_response
 
 
 if __name__ == "__main__":
-    logging.info('Running App')
+    logging.info('Starting App...')
     uvicorn.run("main:app", host="localhost", port=8008, reload=True)
