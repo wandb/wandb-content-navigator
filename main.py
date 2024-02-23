@@ -10,7 +10,6 @@ import numpy as np
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from load_dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from config import NavigatorConfig

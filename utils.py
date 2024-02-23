@@ -3,7 +3,7 @@ import os
 from typing import Dict, List, Tuple
 
 import instructor
-from load_dotenv import load_dotenv
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from config import NavigatorConfig
