@@ -22,14 +22,15 @@ from llm_utils import (
     ExpandedQuery,
     ExplainedChunk,
     Query,
+    ContentNavigatorResponse,
 )
 from retriever import setup_langchain_retriever
+from config import NavigatorConfig
 
 load_dotenv('.env')
-
 logging.basicConfig(level=logging.INFO)
-
-from config import NavigatorConfig
+aclient = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+aclient = instructor.patch(aclient)
 
 config = NavigatorConfig()
 
@@ -88,7 +89,7 @@ sources were filtered out due to dummy, no-result chunk returned")
 
     # Remove chunks than contain non-english characters
     cleaned_chunks = [chunk for chunk in cleaned_chunks if \
-                      not re.search(NON_ENGLISH_REGEX_SEARCH, chunk["text"])]
+                      not re.search(config.NON_ENGLISH_REGEX_SEARCH, chunk["text"])]
     logging.info(f"{n_cleaned_chunks - len(cleaned_chunks)} \
 sources were filtered out due to language.")
     n_cleaned_chunks = len(cleaned_chunks)
@@ -116,15 +117,16 @@ sources were filtered out due to language.")
     
 
 def postprocess_retriever_response(
-        response: List[Tuple[ExplainedChunk, str, List]], 
-        username: str
+        response: List[Tuple[ExplainedChunk, str, List]],
+        username: str,
         debug_mode: bool
-        ) -> List(str, str):
+        ) -> Tuple[str, str]:
     ### FILTER OUT SOURCES THAT THE MODEL THINKS ARE IRRELEVANT ###
     # Remove any sources that weren't considered useful
+    len_explanations = len(response)
     cleaned_response = [(explanation, source, score) for explanation, source, score in 
     response if explanation.content_is_relevant is True]
-    logger.info(f"{len_explanations - len(cleaned_response)} pieces of content found to \
+    logging.info(f"{len_explanations - len(cleaned_response)} pieces of content found to \
 be irrelevant and removed")
 
     ### SEND CONTENT SUUGESTIONS BACK TO SLACK USER ###
@@ -135,12 +137,12 @@ your query."
     # Response if content suggestions found
     else:
         slack_response = f"Hey <@{username}>, content suggestions below:\n\n"
-        for explanation, source, score in cleaned_response[:N_SOURCES_TO_SEND]:
+        for explanation, source, score in cleaned_response[:config.N_SOURCES_TO_SEND]:
             # fix links that have spaces
             source = source.replace(' ', '%20')
 
             # Show more info in debug mode
-            if '--debug' not in user_query:
+            if not debug_mode:
                 slack_response += f"• {explanation.content_description} - <{source}|Link>\n\n"
             else:
                 slack_response += f"*Score*: {score}, *Source*: {source}\n\
@@ -153,21 +155,21 @@ your query."
     # logger.info(f"Sent message: {slack_text}")
     
     ### PRINT REJECTED SOURCES IN SLACK IN DEBUG MODE ###
-    debug_slack_response = ""
+    rejected_slack_response = ""
     if debug_mode:
         rejected_responses = [(explanation, source, score) for 
         explanation, source, score in response if
         explanation.content_is_relevant is not True]
         for explanation, source, score in rejected_responses:
             source = source.replace(' ', '%20')
-            debug_slack_response += f"REJECTED, *Score*: {score}, *Source*: {source}\n\
+            rejected_slack_response += f"REJECTED, *Score*: {score}, *Source*: {source}\n\
 *reason_why_helpful*: {explanation.reason_why_helpful}\n\
 *chain_of_thought*: {explanation.chain_of_thought}\n\
 *content_is_relevant*: {explanation.content_is_relevant}\n\
 *content_description*: {explanation.content_description}\n\n"
             # await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
 
-    return slack_text, debug_slack_response
+    return slack_response, rejected_slack_response
 
 
 ### RUN THE APP
@@ -189,7 +191,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.post("/get_content")
-async def get_content(query: Query) -> List[Tuple[ExplainedChunk, str, List]]:
+async def get_content(query: Query) -> ContentNavigatorResponse:
     logging.info('\n\nReceived query: %s from user: %s', query.query, query.username)
     # Strip any leading or trailing whitespace
     query.query = query.query.strip()
@@ -253,8 +255,8 @@ sources were retrieved more than once.")
             chunks_to_merge = [chunk for chunk in cleaned_chunks if 
                                chunk["metadata"]["source"] == source]
             for c in chunks_to_merge:
-                logging.info(f"Source: {c['metadata']['source']}, 
-                             chunk length: {len(c['text'])}, chunk content:")
+                logging.info(f"Source: {c['metadata']['source']}, \
+chunk length: {len(c['text'])}, chunk content:")
                 logging.info(c['text'])
                 logging.info("END END END/n/n/n")
             logging.info(f"Number of chunks_to_merge: {len(chunks_to_merge)}")
@@ -271,7 +273,7 @@ sources were retrieved more than once.")
     cleaned_chunks = [dict(chunk, score=[chunk["score"]]) if not
                        isinstance(chunk["score"], list) else chunk for chunk in cleaned_chunks]        
     logging.info(f"{len(cleaned_chunks)} chunks in cleaned_chunks after \
-                 checking for multiple sources.")
+checking for multiple sources.")
 
     ### EXPLAIN WHY EACH CHUNK IS RELEVANT TO THE QUERY ###
     # Explain usefulness
@@ -286,12 +288,16 @@ sources were retrieved more than once.")
 
     # result = process_response(response)
 
-    slack_response, debug_slack_response = postprocess_retriever_response(
-        result, 
-        query.username
+    slack_response, rejected_slack_response = postprocess_retriever_response(
+        result,
+        query.username,
+        debug_mode
     )
 
-    return slack_response, debug_slack_response
+    response = ContentNavigatorResponse(
+        slack_response=slack_response,
+        rejected_slack_response=rejected_slack_response)
+    return response
 
 
 if __name__ == "__main__":

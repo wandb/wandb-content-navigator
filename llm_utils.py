@@ -8,7 +8,14 @@ from pydantic import BaseModel, Field
 
 class Query(BaseModel):
     '''A user query'''
+    username: str = None
     query: str
+
+
+class ContentNavigatorResponse(BaseModel):
+    '''Response from the content navigator app'''
+    slack_response: str
+    rejected_slack_response: str = ""
 
 
 class ExplainedChunk(BaseModel):

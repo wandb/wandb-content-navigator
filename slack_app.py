@@ -1,16 +1,12 @@
-import os
-import re
-import json
 import asyncio
 import logging
-import httpx
+import os
 from typing import List, Tuple
 
-from slack_bolt.async_app import AsyncApp
-from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+import httpx
 from dotenv import load_dotenv
-
-from main import ExplainedChunk, Query, process_query
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp
 
 load_dotenv('.env')
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +28,6 @@ async def handle_message_events(body, logger):
     logger.info("Message received")
     # logger.info(body)
 
-
 @app.event("app_mention")
 async def handle_app_mentions(event, say, logger):
     logger.info("App mention received:")
@@ -53,17 +48,35 @@ async def handle_app_mentions(event, say, logger):
     logger.info("Retrieving content suggestions...")
     # response: List[Tuple[ExplainedChunk, str]] = await process_query(Query(query=query))
     async with httpx.AsyncClient(timeout=1200.0) as content_client:
-        slack_response, debug_slack_response: Tuple[str, str] = await content_client.post(
+       response = await content_client.post(
             "http://localhost:8008/get_content", 
             json={"query": user_query, "username": username}
         )
+    if response.status_code == 200:
+        data = response.json()  # Parse the JSON response body
+        logger.info(f"Received content suggestions:\n{data}")
+        slack_response = data.get("slack_response")
+        rejected_slack_response = data.get("rejected_slack_response")
+    else:
+        error_msg = f"Failed to get content suggestions. Status code: \
+{response.status_code}\n\nresponse: {response}"
+        logger.error(error_msg)
+        await say(error_msg,
+                channel=SLACK_CHANNEL_ID,
+                thread_ts=ts)
+        return None
+        # Handle error appropriately, maybe set slack_response and rejected_slack_response to some error message
+    # (slack_response, rejected_slack_response) = responses
         
     await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
     logger.info(f"Sent message: {slack_response}\n")
-    if len(debug_slack_response) > 1:
-        await say(debug_slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
-        logger.info(f"Sent debug message: {debug_slack_response}\n")
-    logger.info(f"Sent message: {slack_response}")
+    if len(rejected_slack_response) > 1:
+        await say(rejected_slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
+        logger.info(f"Sent debug message: {rejected_slack_response}\n")
+
+    logger.info("Finished answering query.")
+    return None
+
 
 async def main():
     handler = AsyncSocketModeHandler(app, SLACK_APP_TOKEN)
