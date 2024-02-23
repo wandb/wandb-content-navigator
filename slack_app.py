@@ -16,10 +16,10 @@ SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 
 app = AsyncApp(token=SLACK_BOT_TOKEN)
 
+
 @app.event("message")
 async def handle_message_events(body, logger):
     logger.info("Message received")
-    # logger.info(body)
 
 
 @app.event("app_mention")
@@ -40,7 +40,6 @@ async def handle_app_mentions(event, say, logger):
 
     # Get content suggestions
     logger.info("Retrieving content suggestions...")
-    # response: List[Tuple[ExplainedChunk, str]] = await process_query(Query(query=query))
     async with httpx.AsyncClient(timeout=1200.0) as content_client:
         response = await content_client.post(
             "http://localhost:8008/get_content",

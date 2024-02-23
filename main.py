@@ -36,6 +36,7 @@ config = NavigatorConfig()
 
 retriever = None
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -70,6 +71,8 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
         ContentNavigatorResponse: The response containing content suggestions.
     """
     logging.info("\n\nReceived query: %s from user: %s", query.query, query.username)
+
+    # Clean up the query
     query.query = query.query.strip()
     query.query = re.sub(r"\<@\w+\>", "", query.query).strip()
 
@@ -77,14 +80,15 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
     if debug_mode:
         query.query = query.query.replace("--debug", "")
 
+    # Augment the user query to improve the changes of good retrieval
     expanded_query = await expand_query(query.query)
-    retriever_query = Query(query=expanded_query.expanded_query)
     logging.info(f"Expanded retriever query: {expanded_query.expanded_query}")
     if debug_mode:
-        logging.info(f"Expanded query CoT: {expanded_query.chain_of_thought}")
+        logging.info(f"Expanded retriever query CoT: {expanded_query.chain_of_thought}")
 
+    # Retrieve relevant chunks from the retrieval chain
     formatted_request = APIRetrievalRequest(
-        query=retriever_query.query,
+        query=expanded_query.expanded_query,
         language=config.LANGUAGE,
         initial_k=config.INITIAL_K,
         top_k=config.TOP_K,
@@ -97,12 +101,13 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
         f'{len(retriever_response["top_k"])} chunks retrieved from retrieval endpoint.'
     )
 
+    # Filter out irrelevant chunks from the retrieved responses
     cleaned_chunks = filter_chunks(retriever_response["top_k"])
-
     logging.info(
         f"After initial filter, there are {len(cleaned_chunks)} chunks in cleaned_chunks."
     )
 
+    # Explain the relevance/usefulness of the retrieved chunks using an LLM
     tasks = [
         explain_usefulness(
             query.query, chunk["text"], chunk["metadata"]["source"], chunk["score"]
@@ -114,14 +119,14 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
 
     result.sort(key=lambda x: np.max(x[2]), reverse=True)
 
+    # Process the retriever response to generate user-friendly messages
     slack_response, rejected_slack_response = postprocess_retriever_response(
         result, query.username, debug_mode
     )
 
-    response = ContentNavigatorResponse(
+    return ContentNavigatorResponse(
         slack_response=slack_response, rejected_slack_response=rejected_slack_response
     )
-    return response
 
 
 if __name__ == "__main__":
