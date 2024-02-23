@@ -20,6 +20,12 @@ from llm_utils import (
     Query,
 )
 from retriever import setup_langchain_retriever
+from utils import (
+    expand_query,
+    explain_usefulness,
+    filter_chunks,
+    postprocess_retriever_response,
+)
 
 load_dotenv(".env")
 logging.basicConfig(level=logging.INFO)
