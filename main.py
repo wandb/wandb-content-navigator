@@ -10,6 +10,7 @@ import numpy as np
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from load_dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from config import NavigatorConfig
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     global retriever
     logging.info("Setting up Retriever...")
-    retriever = setup_langchain_retriever()
+    retriever = setup_langchain_retriever(config.FULLY_CONNECTED_SUMMARIES_FILEPATH)
     logging.info("Retriever setup complete.")
     yield
     del retriever
