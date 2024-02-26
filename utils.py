@@ -109,7 +109,7 @@ to dummy, no-result chunk returned"
 
 def postprocess_retriever_response(
     response: List[Tuple[ExplainedChunk, str, List[float]]],
-    username: str,
+    user_id: str,
     debug_mode: bool,
 ) -> Tuple[str, str]:
     """
@@ -118,7 +118,7 @@ def postprocess_retriever_response(
     Args:
         response (List[Tuple[ExplainedChunk, str, List[float]]]): The explanations, \
 sources, and scores.
-        username (str): The username of the requester.
+        user_id (str): The user_id of the requester.
         debug_mode (bool): Whether the request is in debug mode.
 
     Returns:
@@ -136,10 +136,12 @@ irrelevant and removed"
     )
 
     if len(cleaned_response) == 0:
-        slack_response = f"Hey <@{username}>, no content suggestions found. Try \
+        slack_response = f"Hey <@{user_id}>, no content suggestions found. Try \
 rephrasing your query."
+        response_items_count = 0
     else:
-        slack_response = f"Hey <@{username}>, content suggestions below:\n\n"
+        response_items_count = len(cleaned_response)
+        slack_response = f"Hey <@{user_id}>, content suggestions below:\n\n"
         for explanation, source, score in cleaned_response[: config.N_SOURCES_TO_SEND]:
             source = source.replace(" ", "%20")
             if not debug_mode:
@@ -166,4 +168,4 @@ rephrasing your query."
 {explanation.chain_of_thought}\n*content_is_relevant*: {explanation.content_is_relevant}\n\
 *content_description*: {explanation.content_description}\n\n"
 
-    return slack_response, rejected_slack_response
+    return slack_response, rejected_slack_response, response_items_count

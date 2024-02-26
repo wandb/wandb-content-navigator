@@ -70,7 +70,7 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
     Returns:
         ContentNavigatorResponse: The response containing content suggestions.
     """
-    logging.info("\n\nReceived query: %s from user: %s", query.query, query.username)
+    logging.info("\n\nReceived query: %s from user: %s", query.query, query.user_id)
 
     # Clean up the query
     query.query = query.query.strip()
@@ -120,12 +120,16 @@ async def get_content(query: Query) -> ContentNavigatorResponse:
     result.sort(key=lambda x: np.max(x[2]), reverse=True)
 
     # Process the retriever response to generate user-friendly messages
-    slack_response, rejected_slack_response = postprocess_retriever_response(
-        result, query.username, debug_mode
-    )
+    (
+        slack_response,
+        rejected_slack_response,
+        response_items_count,
+    ) = postprocess_retriever_response(result, query.user_id, debug_mode)
 
     return ContentNavigatorResponse(
-        slack_response=slack_response, rejected_slack_response=rejected_slack_response
+        slack_response=slack_response,
+        rejected_slack_response=rejected_slack_response,
+        response_items_count=response_items_count,
     )
 
 

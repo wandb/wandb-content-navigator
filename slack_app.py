@@ -33,7 +33,7 @@ async def handle_app_mentions(event, say, logger):
     logger.info(f"Received user query: {user_query}")
 
     ts = event.get("ts")
-    username = event.get("user")
+    user_id = event.get("user")
 
     # Send initial response to the user
     await say("Working on it :D", channel=SLACK_CHANNEL_ID, thread_ts=ts)
@@ -43,13 +43,14 @@ async def handle_app_mentions(event, say, logger):
     async with httpx.AsyncClient(timeout=1200.0) as content_client:
         response = await content_client.post(
             "http://localhost:8008/get_content",
-            json={"query": user_query, "username": username},
+            json={"query": user_query, "user_id": user_id},
         )
     if response.status_code == 200:
         data = response.json()  # Parse the JSON response body
         logger.info(f"Received content suggestions:\n{data}")
         slack_response = data.get("slack_response")
         rejected_slack_response = data.get("rejected_slack_response")
+        response_items_count = data.get("response_items_count")
     else:
         error_msg = f"Failed to get content suggestions. Status code: \
 {response.status_code}\n\nresponse: {response}"
@@ -57,8 +58,14 @@ async def handle_app_mentions(event, say, logger):
         await say(error_msg, channel=SLACK_CHANNEL_ID, thread_ts=ts)
         return None
 
-    await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
-    logger.info(f"Sent message: {slack_response}\n")
+    if response_items_count > 0:
+        await say(slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
+        logger.info(f"Sent message: {slack_response}\n")
+    else:
+        await say("No content suggestions found. Try rephrasing your query, but note \
+there may also not be any relevant pieces of content for this query. Add '--debug' to \
+your query and try again to see a detailed resoning for each suggestion.", 
+                  channel=SLACK_CHANNEL_ID, thread_ts=ts)
     if len(rejected_slack_response) > 1:
         await say(rejected_slack_response, channel=SLACK_CHANNEL_ID, thread_ts=ts)
         logger.info(f"Sent debug message: {rejected_slack_response}\n")

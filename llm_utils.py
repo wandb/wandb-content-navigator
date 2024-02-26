@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class Query(BaseModel):
     """A user query"""
 
-    username: str = None
+    user_id: str = None
     query: str
 
 
@@ -19,6 +19,7 @@ class ContentNavigatorResponse(BaseModel):
 
     slack_response: str
     rejected_slack_response: str = ""
+    response_items_count: int = 0
 
 
 class ExplainedChunk(BaseModel):
