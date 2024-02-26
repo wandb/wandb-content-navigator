@@ -8,7 +8,6 @@ load_dotenv()
 class NavigatorConfig(BaseSettings):
     API_KEY: str = os.getenv('OPENAI_API_KEY')
     EXPLANATION_MODEL: str = "gpt-4-0125-preview"
-    # EXPLANATION_MODEL = "gpt-3.5-turbo-1106"
     QUERY: str = 'do we have any reports I could send to a finance company?'
     TOP_K: int = 4
     SCORE_THRESHOLD: float = 0.15
