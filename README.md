@@ -2,6 +2,11 @@
 
 The Content Navigator is designed to suggest relevant Weights & Biases content such as articles, case studies, white papers, courses, event recordings etc based on user queries.
 
+- [Workflow](#workflow)
+- [Usage](#usage)
+- [Data](#data)
+
+
 ## Workflow
 
 1. **User Query**: A user mentions the Slack app in a channel with a query or hits the `/get_content` endpoint with a query of type `ContentNavigatorRequest`.
@@ -58,3 +63,7 @@ python main.py
 **Replit**
 
 You can deploy this app easily on Replit by importing this repo, setting the environment variables in Replit Secrets and passing Replit Deployments the `build.sh` and `run.sh` files.
+
+
+## Data
+Currently (as of February 2024) the app is using summarised articles from the Fully Connected blog. These were downloaded and summaries genereted the [Weights & Biases Content Tools repo](https://github.com/wandb/growth-content-tools) project. The data is available in the `data/fully_connected_summaries_final.csv` file.
