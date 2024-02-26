@@ -8,8 +8,8 @@ The Content Navigator is designed to suggest relevant Weights & Biases content s
 2. **Query Expansion**: The query is expanded in `expand_query` by asking an LLM to add relevant AI/ML topics 
 3. **Content Retrieval**: Content is retrieved over a FAISS vectorstore using the expaned query
 4. **Content Explanation**: The relevance of each piece of content is explained and assessed using an LLM in `explain_usefulness`. This includes a chain of thought as well as a boolen filter for whether or not the content is relevant to the original user query.
-5. **Response Generation**: The app formats the content suggestions and explanations into a Slack message.
-6. **Response Generation**: If "--debug" is included in the query, the app will also generate a debug message with more detailed reasoning for each content suggestion.
+5. **Response Generation**: The app formats the content suggestions and explanations into a Slack message in a response of type `ContentNavigatorResponse`.
+6. **Debug messaging**: If "--debug" is included in the query, the app will also generate a debug message with more detailed reasoning for each content suggestion and the content that was considered not relevant in step 4.
 
 
 ## Usage
