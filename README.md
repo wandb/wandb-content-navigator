@@ -54,3 +54,7 @@ To run just the FastAPI endpoint, run:
 ```bash
 python main.py
 ```
+
+**Replit**
+
+You can deploy this app easily on Replit by importing this repo, setting the environment variables in Replit Secrets and passing Replit Deployments the `build.sh` and `run.sh` files.
