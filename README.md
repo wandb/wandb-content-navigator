@@ -14,9 +14,10 @@ The Content Navigator is designed to suggest relevant Weights & Biases content s
 
 ## Usage
 
-Run `run.sh` to run the app, this will start the FastAPI endpoint and the Slack app. 
+Install all dependencies by running `bash build.sh`, you will need Poetry installed. Then run `bash run.sh` to run the app, this will start the FastAPI endpoint and the Slack app. 
 
 **Environment Variables**
+
 You will need to set the following environment variables in a `.env` file:
 
 ```
@@ -37,10 +38,6 @@ SCORE_THRESHOLD  # Similarity threshold for content relevance (higher = more sim
 N_SOURCES_TO_SEND  # Number of sources to send in the response
 FULLY_CONNECTED_SUMMARIES_FILEPATH  # Path to the fully connected article summaries csv
 ```
-
-## Run Locally
-
-To run the app locally, you will need to install the dependencies and run the FastAPI endpoint and the Slack app.
 
 **Slack App**
 
