@@ -17,4 +17,4 @@ class NavigatorConfig(BaseSettings):
     EXCLUDE_TAGS: list[str] = ['']  # ['ml-news', 'gradient-dissent']
     NON_ENGLISH_REGEX_SEARCH: str = r'[^\x00-\x7F]'
     N_SOURCES_TO_SEND: int = 5  # Number of suggestions to send to the user
-    FULLY_CONNECTED_SUMMARIES_FILEPATH: str = "data/fully_connected_summaries_final.csv"
+    FULLY_CONNECTED_SUMMARIES_FILEPATH: str = "data/fully_connected_summaries_final_20240226.csv"
